@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ניהול הוצאות משותף</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        /* --- CSS STYLES (No Changes) --- */
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700;900&display=swap');
+
+        :root {
+            --primary: #4a90e2;   
+            --secondary: #50e3c4; 
+            --accent: #f5a623;    
+            --danger: #e74c3c;    
+            --dark: #2c3e50;
+            --light: #f4f6f8;
+            --white: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--light);
+            margin: 0;
+            padding: 20px;
+            direction: rtl; 
+            color: var(--dark);
+            overscroll-behavior-y: none; 
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: transparent;
+        }
+
+        h1, h2, h3 {
+            text-align: center;
+            font-weight: 900; 
+            margin-bottom: 25px;
+            font-size: 1.8rem; 
+        }
+
+        /* View Switching Logic */
+        .view-section {
+            display: none; 
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        .view-section.active {
+            display: block; 
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 20px; 
+            margin: 15px 0;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2rem; 
+            font-weight: 700; 
+            cursor: pointer;
+            color: white;
+            transition: transform 0.1s, filter 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        }
+
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.6; pointer-events: none; }
+
+        .btn-orly { background-color: #ff6b6b; } 
+        .btn-ran { background-color: #4ecdc4; } 
+        .btn-summary { background-color: var(--primary); }
+        
+        /* SUBMIT BUTTON STYLE */
+        .btn-submit { 
+            background: linear-gradient(45deg, #2ecc71, #3498db); 
+            color: white; 
+            font-size: 1.4rem;
+            margin-top: 30px;
+        }
+        
+        .btn-back { background-color: #95a5a6; margin-top: 10px; padding: 16px; font-weight: 500;}
+        .btn-export { background-color: #27ae60; font-size: 1rem; padding: 14px; }
+        .btn-archive { background-color: var(--accent); font-size: 1rem; padding: 14px; }
+        .btn-delete { background: none; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0;}
+
+        /* Form Elements */
+        .form-group { margin-bottom: 20px; }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700; 
+            font-size: 1.1rem; 
+        }
+
+        input[type="number"], input[type="date"] {
+            width: 100%;
+            padding: 16px; 
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 1.2rem; 
+            font-family: inherit;
+            background: #fafafa;
+        }
+
+        /* Radio Grid */
+        .reasons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .reason-option input[type="radio"] { display: none; }
+        
+        .reason-option label {
+            display: block;
+            padding: 15px; 
+            background: #eee;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: 0.2s;
+            border: 2px solid transparent;
+            margin-bottom: 0; 
+        }
+
+        .reason-option input:checked + label {
+            background-color: var(--primary);
+            color: white;
+            border-color: #2980b9;
+        }
+
+        /* Table */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 0.9rem; 
+        }
+        th, td { 
+            padding: 12px 6px; 
+            text-align: right; 
+            border-bottom: 1px solid #eee; 
+            vertical-align: middle;
+        }
+        th:last-child { 
+            text-align: center; 
+            width: 10%; 
+        } 
+        td:last-child {
+            text-align: center;
+        }
+        th { color: #7f8c8d; font-weight: 700; }
+        td { font-weight: 500; }
+        .amount-cell { font-weight: 700; color: var(--dark); direction: ltr; }
+
+        /* Filter Tabs */
+        .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .filter-tabs .btn { margin: 0; padding: 12px; font-size: 1rem; font-weight: 600; flex-grow: 1; }
+
+        /* Archive View Specific Style */
+        #view-archive table th, #view-archive table td {
+            font-size: 0.85rem;
+            padding: 8px 4px;
+        }
+        /* New style for balance display */
+        .balance-info {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 15px;
+            font-weight: 700;
+            line-height: 1.5;
+        }
+        .balance-info.orly-owes { background-color: #ffcccc; color: var(--danger); }
+        .balance-info.ran-owes { background-color: #ccffcc; color: #2ecc71; }
+        .balance-info.equal { background-color: #eeeeee; color: var(--dark); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div id="view-home" class="view-section active">
+        <h1>ניהול הוצאות משותף</h1>
+        <div class="card" style="text-align: center; padding: 40px 20px;">
+            <p style="color:#7f8c8d; font-weight: 500; margin-bottom: 30px;">ברוכים הבאים! מי מוסיף הוצאה?</p>
+            
+            <button onclick="goToInput('Orly')" class="btn btn-orly">אורלי</button>
+            <button onclick="goToInput('Ran')" class="btn btn-ran">רן</button>
+            <div style="height: 20px;"></div> 
+            <button onclick="goToSummary()" class="btn btn-summary">סיכום ודוחות</button>
+        </div>
+    </div>
+
+    <div id="view-input" class="view-section">
+        <h2 id="input-title">הוצאה חדשה</h2>
+        
+        <div class="card">
+            <form id="expenseForm">
+                <div class="form-group">
+                    <label>תאריך</label>
+                    <input type="date" id="dateInput" required>
+                </div>
+
+                <div class="form-group">
+                    <label>סכום (₪)</label>
+                    <input type="number" id="amountInput" step="0.01" inputmode="decimal" placeholder="0.00" required>
+                </div>
+
+                <div class="form-group">
+                    <label>סיבת הוצאה (בחר אחת)</label>
+                    <div class="reasons-grid">
+                        <div class="reason-option"><input type="radio" name="reason" value="דלק" id="r1" required><label for="r1">דלק</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="חשמל" id="r2"><label for="r2">חשמל</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="מים" id="r3"><label for="r3">מיים</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="ארנונה" id="r4"><label for="r4">ארנונה</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="שכירות" id="r5"><label for="r5">שכירות</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="קניות" id="r6"><label for="r6">קניות</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="אוכל" id="r7"><label for="r7">אוכל</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="רהיטים לבית" id="r8"><label for="r8">רהיטים לבית</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="הגיינה" id="r9"><label for="r9">הגיינה</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="אחר" id="r10"><label for="r10">אחר</label></div>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn btn-submit">שמור</button>
+            </form>
+        </div>
+        
+        <button onclick="showView('view-home')" class="btn btn-back">ביטול וחזרה</button>
+    </div>
+
+    <div id="view-summary" class="view-section">
+        <h2 id="summary-header">סיכום חודש נוכחי</h2>
+
+        <div class="filter-tabs">
+            <button class="btn btn-summary" onclick="loadData('all')">כולם</button>
+            <button class="btn btn-orly" onclick="loadData('Orly')">אורלי</button>
+            <button class="btn btn-ran" onclick="loadData('Ran')">רן</button>
+        </div>
+
+        <div class="card">
+            <h3>חישוב מאזן ותשלום</h3>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:1">
+                    <label style="font-size:0.9rem; font-weight: 500;">הכנסות אורלי</label>
+                    <input type="number" id="incomeOrly" placeholder="0" oninput="saveIncomes(); updateBalanceDisplay();" onchange="saveIncomes()">
+                </div>
+                <div style="flex:1">
+                    <label style="font-size:0.9rem; font-weight: 500;">הכנסות רן</label>
+                    <input type="number" id="incomeRan" placeholder="0" oninput="saveIncomes(); updateBalanceDisplay();" onchange="saveIncomes()">
+                </div>
+            </div>
+            
+            <div style="text-align:center; padding-top:10px; border-top:1px solid #eee;">
+                <span style="font-weight: 500;">יתרה נשארת (הכנסות - הוצאות): </span>
+                <strong id="totalBalance" style="font-size:1.6rem; font-weight: 900;">...</strong>
+            </div>
+
+            <div id="paymentBalance" class="balance-info equal">
+                ...
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>חלוקה לפי קטגוריות</h3>
+            <div class="chart-box">
+                <canvas id="expenseChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card" style="overflow-x: auto;">
+            <h3>הוצאות אחרונות</h3>
+            <table id="expenseTable">
+                <thead>
+                    <tr>
+                        <th>תאריך</th>
+                        <th>שם</th>
+                        <th>סיבה</th>
+                        <th>סכום</th>
+                        <th>מחק</th> 
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+        <button onclick="showArchiveView()" class="btn btn-archive">צפייה בארכיון חודשים קודמים</button>
+        <button onclick="exportToCSV(allExpenses, 'current_month')" class="btn btn-export">ייצא לאקסל (CSV)</button>
+        <button onclick="showView('view-home')" class="btn btn-back">חזרה לראשי</button>
+    </div>
+    
+    <div id="view-archive" class="view-section">
+        <h2>ארכיון הוצאות חודשי</h2>
+        <div id="archive-content">
+            <p style="text-align:center">טוען ארכיון...</p>
+        </div>
+        <button onclick="showView('view-summary')" class="btn btn-back">חזרה לסיכום הנוכחי</button>
+    </div>
+
+</div>
+
+<script>
+    // --- 1. FIREBASE CONFIGURATION ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyALMnTRmdUiJRW3thslw7-kvAyMqDMEdnU",
+        authDomain: "calc-1fddb.firebaseapp.com",
+        projectId: "calc-1fddb",
+        storageBucket: "calc-1fddb.firebasestorage.app",
+        messagingSenderId: "402745254478",
+        appId: "1:402745254478:web:ceb1858be0030ec078191f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // --- 2. APP STATE VARIABLES ---
+    let currentFilter = 'all'; 
+    let currentUser = ""; 
+    let allExpenses = [];
+    let myChart = null;
+    let currentTotalSpent = 0;
+    
+    // Total spent by each person (for balance calculation)
+    let orlyTotalSpent = 0;
+    let ranTotalSpent = 0;
+
+    // --- 3. LIFECYCLE & MONTHLY LOGIC ---
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initMonthlyData();
+    });
+
+    function initMonthlyData() {
+        // 1. Load income values from Local Storage
+        const incomes = JSON.parse(localStorage.getItem('monthlyIncomes') || '{}');
+        document.getElementById('incomeOrly').value = incomes.Orly || '';
+        document.getElementById('incomeRan').value = incomes.Ran || '';
+        
+        // 2. Check for month change and handle archive
+        checkForNewMonth();
+        
+        // 3. Initial display (will be fully updated after loadData is called)
+        updateBalanceDisplay();
+    }
+    
+    function saveIncomes() {
+        const incomes = {
+            Orly: parseFloat(document.getElementById('incomeOrly').value) || 0,
+            Ran: parseFloat(document.getElementById('incomeRan').value) || 0
+        };
+        localStorage.setItem('monthlyIncomes', JSON.stringify(incomes));
+    }
+
+    // (checkForNewMonth function remains the same)
+    async function checkForNewMonth() {
+        const today = new Date();
+        const currentMonthKey = `${today.getFullYear()}-${today.getMonth() + 1}`;
+        const lastMonthKey = localStorage.getItem('lastActiveMonth');
+
+        if (lastMonthKey && lastMonthKey !== currentMonthKey) {
+            console.warn(`New month detected! Archiving data for ${lastMonthKey}...`);
+            
+            // 1. Get all current expenses to archive
+            const currentExpensesSnapshot = await db.collection("expenses").get();
+            const currentExpenses = [];
+            currentExpensesSnapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                currentExpenses.push(data);
+            });
+
+            if (currentExpenses.length > 0) {
+                // 2. Save current expenses and income to Archive in Local Storage
+                const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
+                
+                archiveData[lastMonthKey] = {
+                    date: lastMonthKey,
+                    incomes: JSON.parse(localStorage.getItem('monthlyIncomes') || '{}'),
+                    expenses: currentExpenses,
+                    totalSpent: currentExpenses.reduce((sum, exp) => sum + exp.amount, 0)
+                };
+                
+                localStorage.setItem('monthlyArchive', JSON.stringify(archiveData));
+                console.log(`Month data for ${lastMonthKey} archived.`);
+                
+                // 3. Reset for the new month (SILENTLY)
+                localStorage.removeItem('monthlyIncomes'); 
+                document.getElementById('incomeOrly').value = ''; 
+                document.getElementById('incomeRan').value = '';
+
+                // 4. Delete documents from Firestore 
+                const docsToDelete = currentExpenses.map(doc => doc.id);
+                const deletePromises = docsToDelete.map(id => 
+                    db.collection("expenses").doc(id).delete().catch(err => console.error(`Error deleting ${id}:`, err))
+                );
+                await Promise.all(deletePromises);
+                console.log('Current month expenses cleared from Firestore.');
+
+            } else {
+                localStorage.removeItem('monthlyIncomes');
+            }
+
+            // 5. Update last active month
+            localStorage.setItem('lastActiveMonth', currentMonthKey);
+        } else if (!lastMonthKey) {
+            // First time load
+            localStorage.setItem('lastActiveMonth', currentMonthKey);
+        }
+    }
+    
+    // --- 4. NAVIGATION LOGIC ---
+    function showView(viewId) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+        window.scrollTo(0,0);
+    }
+
+    function goToInput(user) {
+        currentUser = user;
+        document.getElementById('input-title').innerText = `הוצאה חדשה - ${user === 'Orly' ? 'אורלי' : 'רן'}`;
+        document.getElementById('expenseForm').reset();
+        document.getElementById('dateInput').valueAsDate = new Date(); 
+        showView('view-input');
+    }
+
+    function goToSummary() {
+        document.getElementById('summary-header').innerText = `סיכום חודש נוכחי`;
+        showView('view-summary');
+        loadData('all'); 
+    }
+
+    async function showArchiveView() {
+        const archiveContent = document.getElementById('archive-content');
+        archiveContent.innerHTML = 'טוען ארכיון...';
+        showView('view-archive');
+
+        const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
+        const monthKeys = Object.keys(archiveData).sort().reverse();
+
+        if (monthKeys.length === 0) {
+            archiveContent.innerHTML = '<p style="text-align:center; font-weight:bold;">אין נתונים בארכיון.</p>';
+            return;
+        }
+
+        let html = '';
+        
+        for (const monthKey of monthKeys) {
+            const data = archiveData[monthKey];
+            
+            const parts = monthKey.split('-');
+            const year = parseInt(parts[0]);
+            const month = parseInt(parts[1]) - 1; 
+            const dateDisplay = new Date(year, month).toLocaleDateString('he-IL', { year: 'numeric', month: 'long' });
+            
+            // Calculate balance and who owes whom for archived month
+            const totalSpent = data.totalSpent;
+            const orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
+            const ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
+            const averageSpend = totalSpent / 2;
+            
+            let balanceText;
+            let balanceColor;
+
+            if (orlySpend > averageSpend) {
+                const diff = orlySpend - averageSpend;
+                balanceText = `אורלי צריכה לקבל ${diff.toFixed(2)} ₪ מרן`;
+                balanceColor = '#ff6b6b';
+            } else if (ranSpend > averageSpend) {
+                const diff = ranSpend - averageSpend;
+                balanceText = `רן צריך לקבל ${diff.toFixed(2)} ₪ מאורלי`;
+                balanceColor = '#4ecdc4';
+            } else {
+                balanceText = 'התשלום היה מאוזן או ללא יתרה לחלוקה.';
+                balanceColor = '#27ae60';
+            }
+            
+            html += `<div class="card" style="border-right: 5px solid ${monthKey === monthKeys[0] ? 'var(--accent)' : 'var(--primary)'};">
+                <h3 style="margin-top:0; margin-bottom:10px;">🗓️ ארכיון: ${dateDisplay}</h3>
+                <p><strong>סך הוצאות:</strong> ${totalSpent.toFixed(2)} ₪</p>
+                <p style="font-weight: bold; color: ${balanceColor};">${balanceText}</p>
+                
+                <p style="margin-top:15px; font-size:0.9rem; color:#7f8c8d;">(אורלי הוציאה: ${orlySpend.toFixed(2)} ₪, רן הוציא: ${ranSpend.toFixed(2)} ₪)</p>
+                <button onclick="displayArchiveTable('${monthKey}')" class="btn btn-summary" style="padding: 10px; font-size:0.9rem;">הצג פירוט הוצאות</button>
+                <div id="archive-table-${monthKey}" style="display:none; margin-top:15px;"></div>
+                <button onclick="exportToCSV(archiveData['${monthKey}'].expenses, 'archive_${monthKey}')" class="btn btn-export" style="padding: 10px; font-size:0.9rem; margin-top:10px;">ייצא CSV</button>
+            </div>`;
+        }
+        
+        archiveContent.innerHTML = html;
+        document.getElementById('summary-header').innerText = `ארכיון חודשי`;
+    }
+
+    window.displayArchiveTable = (monthKey) => {
+        const archiveData = JSON.parse(localStorage.getItem('monthlyArchive'));
+        const expenses = archiveData[monthKey].expenses;
+        const targetDiv = document.getElementById(`archive-table-${monthKey}`);
+        
+        if (targetDiv.style.display === 'block') {
+            targetDiv.style.display = 'none';
+            return;
+        }
+
+        let tableHtml = `<table style="font-size:0.8rem;">
+            <thead><tr><th>תאריך</th><th>שם</th><th>סיבה</th><th>סכום</th></tr></thead>
+            <tbody>`;
+            
+        expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        expenses.forEach(data => {
+            tableHtml += `<tr>
+                <td>${data.date.split('-').reverse().join('/')}</td>
+                <td>${data.person === 'Orly' ? 'אורלי' : 'רן'}</td>
+                <td>${data.reason}</td>
+                <td class="amount-cell">${data.amount.toFixed(2)} ₪</td>
+            </tr>`;
+        });
+        
+        tableHtml += '</tbody></table>';
+        targetDiv.innerHTML = tableHtml;
+        targetDiv.style.display = 'block';
+    }
+
+
+    // --- 5. INPUT HANDLING ---
+    const form = document.getElementById('expenseForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const amount = document.getElementById('amountInput').value;
+        const date = document.getElementById('dateInput').value;
+        const reasonEl = document.querySelector('input[name="reason"]:checked');
+
+        if(!reasonEl) {
+            alert("יש לבחור סיבה אחת");
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "שומר...";
+
+        try {
+            await db.collection("expenses").add({
+                person: currentUser,
+                amount: parseFloat(amount),
+                reason: reasonEl.value, 
+                date: date,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            submitBtn.innerText = "נשמר!";
+            // Go to home view and then refresh summary data in the background
+            setTimeout(() => { 
+                showView('view-home'); 
+                // Pre-load data for summary next time
+                loadData('all');
+            }, 500);
+            
+        } catch (error) {
+            console.error("Error:", error);
+            alert("שגיאה בשמירה: " + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "שמור";
+        }
+    });
+
+    // --- 6. SUMMARY & DELETE LOGIC ---
+    async function loadData(filter) {
+        currentFilter = filter; 
+        const tbody = document.querySelector('#expenseTable tbody');
+        tbody.innerHTML = '<tr><td colspan="5">טוען נתונים...</td></tr>'; 
+        
+        let query = db.collection("expenses");
+        
+        // --- INDEX FIX LOGIC ---
+        // For 'all' filter, only need to sort by date DESC.
+        // For person filter, need composite index (person ASC, date DESC).
+        if(filter !== 'all') {
+            query = query.where("person", "==", filter).orderBy("date", "desc");
+        } else {
+            query = query.orderBy("date", "desc");
+        }
+
+        try {
+            const snapshot = await query.get();
+            allExpenses = [];
+            currentTotalSpent = 0;
+            orlyTotalSpent = 0;
+            ranTotalSpent = 0;
+            tbody.innerHTML = ''; 
+
+            if (snapshot.empty) {
+                tbody.innerHTML = '<tr><td colspan="5">אין נתונים להצגה עבור מסנן זה</td></tr>';
+            }
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id; 
+                allExpenses.push(data);
+                
+                // Track total spent for the entire collection (regardless of current filter for display)
+                if (data.person === 'Orly') {
+                    orlyTotalSpent += data.amount;
+                } else if (data.person === 'Ran') {
+                    ranTotalSpent += data.amount;
+                }
+                currentTotalSpent += data.amount; // Total of ALL items loaded
+
+                // Only display data matching the current filter (which is already done by the query)
+                const displayName = data.person === 'Orly' ? 'אורלי' : 'רן';
+                const row = `<tr>
+                    <td>${data.date.split('-').reverse().join('/')}</td>
+                    <td>${displayName}</td>
+                    <td>${data.reason}</td>
+                    <td class="amount-cell">${data.amount.toFixed(2)} ₪</td>
+                    <td><button class="btn-delete" onclick="deleteExpense('${data.id}')">❌</button></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+        } catch (error) {
+            console.error("Firestore Query Error:", error);
+            // Display clear index error message
+            if (error.code === 'failed-precondition' || error.message.includes('The query requires an index')) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color:red; font-weight:bold; padding:20px;">שגיאה: חובה ליצור אינדקס ב-Firebase. יש לוודא שהוגדר: person ASC, date DESC</td></tr>';
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" style="color:red; font-weight:bold;">שגיאה בטעינת הנתונים: ${error.message}</td></tr>`;
+            }
+            allExpenses = []; 
+            currentTotalSpent = 0; // Reset totals on major error
+            orlyTotalSpent = 0;
+            ranTotalSpent = 0;
+        }
+        
+        // Always update chart and balance display after data attempt
+        updateChart(allExpenses); 
+        updateBalanceDisplay();
+    }
+
+    window.deleteExpense = async (id) => {
+        if (!confirm("האם אתה בטוח שברצונך למחוק הוצאה זו?")) {
+            return;
+        }
+
+        try {
+            await db.collection("expenses").doc(id).delete();
+            // Refresh the list with the current filter
+            loadData(currentFilter); 
+
+        } catch (error) {
+            console.error("Error deleting document:", error);
+            alert("שגיאה במחיקת ההוצאה: " + error.message);
+        }
+    }
+
+    // --- 7. CHART LOGIC (Unchanged) ---
+    function updateChart(data) {
+        const categoryTotals = {};
+        
+        // Use all expenses loaded to generate the pie chart
+        const expensesForChart = currentFilter === 'all' ? data : allExpenses; // Use all expenses if filtered, to show full breakdown
+        
+        expensesForChart.forEach(item => {
+            const reason = item.reason; 
+            if(!categoryTotals[reason]) categoryTotals[reason] = 0;
+            categoryTotals[reason] += item.amount;
+        });
+
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        if(myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(categoryTotals),
+                datasets: [{
+                    data: Object.values(categoryTotals),
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
+                        '#FF9F40', '#E7E9ED', '#76D7C4', '#F1948A', '#85C1E9'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { family: 'Rubik' } } }
+                }
+            }
+        });
+    }
+
+    // --- 8. BALANCE CALCULATION (Major Update) ---
+    function updateBalanceDisplay() {
+        // 1. Calculate General Remaining Balance (Income - Total Spent)
+        const incOrly = parseFloat(document.getElementById('incomeOrly').value) || 0;
+        const incRan = parseFloat(document.getElementById('incomeRan').value) || 0;
+        
+        const generalBalance = (incOrly + incRan) - currentTotalSpent;
+        
+        const totalBalanceEl = document.getElementById('totalBalance');
+        totalBalanceEl.innerText = '₪' + generalBalance.toFixed(2);
+        totalBalanceEl.style.color = generalBalance >= 0 ? '#27ae60' : '#e74c3c';
+
+        // 2. Calculate Payment Balance (Who owes whom)
+        const paymentBalanceEl = document.getElementById('paymentBalance');
+        const averageSpend = currentTotalSpent / 2;
+        const diffOrly = orlyTotalSpent - averageSpend;
+
+        paymentBalanceEl.className = 'balance-info'; 
+        
+        if (currentTotalSpent === 0) {
+             paymentBalanceEl.classList.add('equal');
+             paymentBalanceEl.innerHTML = `טרם נרשמו הוצאות לחודש זה.`;
+        } else if (Math.abs(diffOrly) < 0.01) {
+            // Check for near zero difference
+            paymentBalanceEl.classList.add('equal');
+            paymentBalanceEl.innerHTML = `ההוצאות מאוזנות! סך כל הוצאות: ${currentTotalSpent.toFixed(2)} ₪.`;
+        } else if (diffOrly > 0) {
+            // Orly spent more, Ran owes Orly
+            const ranOwes = diffOrly.toFixed(2);
+            paymentBalanceEl.classList.add('ran-owes');
+            paymentBalanceEl.innerHTML = `
+                💰 **רן חייב לאורלי:** ${ranOwes} ₪ <br> 
+                (אורלי הוציאה: ${orlyTotalSpent.toFixed(2)} ₪, רן הוציא: ${ranTotalSpent.toFixed(2)} ₪)
+            `;
+        } else {
+            // Ran spent more, Orly owes Ran
+            const orlyOwes = Math.abs(diffOrly).toFixed(2);
+            paymentBalanceEl.classList.add('orly-owes');
+            paymentBalanceEl.innerHTML = `
+                💰 **אורלי חייבת לרן:** ${orlyOwes} ₪ <br> 
+                (אורלי הוציאה: ${orlyTotalSpent.toFixed(2)} ₪, רן הוציא: ${ranTotalSpent.toFixed(2)} ₪)
+            `;
+        }
+    }
+
+    // --- 9. EXPORT (Unchanged) ---
+    function exportToCSV(data, filenamePrefix) {
+        if(data.length === 0) { alert("אין נתונים לייצוא"); return; }
+
+        let csv = "\uFEFFתאריך,שם,סיבה,סכום\n"; 
+        data.forEach(row => {
+            const safeReason = row.reason.replace(/"/g, '""');
+            const displayName = row.person === 'Orly' ? 'אורלי' : 'רן';
+            csv += `${row.date},${displayName},"${safeReason}",${row.amount}\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `${filenamePrefix}_expenses_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+</body>
+</html>
