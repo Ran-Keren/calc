@@ -10,8 +10,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        /* --- CSS STYLES (No Changes) --- */
-        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700;900&display=swap');
+        /* --- CSS STYLES --- */
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght=300;400;500;700;900&display=swap');
 
         :root {
             --primary: #4a90e2;   
@@ -192,18 +192,76 @@
             font-size: 0.85rem;
             padding: 8px 4px;
         }
-        /* New style for balance display */
-        .balance-info {
+        
+        /* Home screen style for clean look */
+        #view-home .card {
+            text-align: center; 
+            padding: 40px 20px;
+        }
+        
+        /* Archive List Scroll Styling */
+        .archive-month-list {
+            display: flex;
+            overflow-x: scroll; /* Enable horizontal scrolling */
+            gap: 10px;
+            padding-bottom: 15px; /* Space for scrollbar */
+            margin-bottom: 20px;
+        }
+        .archive-month-list::-webkit-scrollbar {
+            height: 5px;
+        }
+        .archive-month-list::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 10px;
+        }
+        
+        .archive-month-item {
+            flex: 0 0 auto; /* Prevent stretching */
+            width: 120px; /* Fixed width for each month card */
+            cursor: pointer;
             padding: 15px;
             border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            background: var(--white);
+            border: 2px solid transparent;
             text-align: center;
-            margin-top: 15px;
-            font-weight: 700;
-            line-height: 1.5;
+            transition: all 0.2s;
         }
-        .balance-info.orly-owes { background-color: #ffcccc; color: var(--danger); }
-        .balance-info.ran-owes { background-color: #ccffcc; color: #2ecc71; }
-        .balance-info.equal { background-color: #eeeeee; color: var(--dark); }
+
+        .archive-month-item h4 {
+            margin: 0 0 5px 0;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .archive-month-item p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+        
+        .archive-month-item.active-month {
+            border-color: var(--accent);
+            background: #fff8e1;
+            box-shadow: 0 4px 10px rgba(245, 166, 35, 0.2);
+        }
+        
+        .archive-month-item.disabled {
+            background: #e0e0e0;
+            cursor: default;
+            opacity: 0.7;
+            pointer-events: none; 
+        }
+
+        .archive-details {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .archive-details button {
+            margin-top: 10px;
+        }
+
     </style>
 </head>
 <body>
@@ -212,9 +270,7 @@
 
     <div id="view-home" class="view-section active">
         <h1>ניהול הוצאות משותף</h1>
-        <div class="card" style="text-align: center; padding: 40px 20px;">
-            <p style="color:#7f8c8d; font-weight: 500; margin-bottom: 30px;">ברוכים הבאים! מי מוסיף הוצאה?</p>
-            
+        <div class="card">
             <button onclick="goToInput('Orly')" class="btn btn-orly">אורלי</button>
             <button onclick="goToInput('Ran')" class="btn btn-ran">רן</button>
             <div style="height: 20px;"></div> 
@@ -242,7 +298,7 @@
                     <div class="reasons-grid">
                         <div class="reason-option"><input type="radio" name="reason" value="דלק" id="r1" required><label for="r1">דלק</label></div>
                         <div class="reason-option"><input type="radio" name="reason" value="חשמל" id="r2"><label for="r2">חשמל</label></div>
-                        <div class="reason-option"><input type="radio" name="reason" value="מים" id="r3"><label for="r3">מיים</label></div>
+                        <div class="reason-option"><input type="radio" name="reason" value="מים" id="r3"><label for="r3">מים</label></div>
                         <div class="reason-option"><input type="radio" name="reason" value="ארנונה" id="r4"><label for="r4">ארנונה</label></div>
                         <div class="reason-option"><input type="radio" name="reason" value="שכירות" id="r5"><label for="r5">שכירות</label></div>
                         <div class="reason-option"><input type="radio" name="reason" value="קניות" id="r6"><label for="r6">קניות</label></div>
@@ -270,33 +326,11 @@
         </div>
 
         <div class="card">
-            <h3>חישוב מאזן ותשלום</h3>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <div style="flex:1">
-                    <label style="font-size:0.9rem; font-weight: 500;">הכנסות אורלי</label>
-                    <input type="number" id="incomeOrly" placeholder="0" oninput="saveIncomes(); updateBalanceDisplay();" onchange="saveIncomes()">
-                </div>
-                <div style="flex:1">
-                    <label style="font-size:0.9rem; font-weight: 500;">הכנסות רן</label>
-                    <input type="number" id="incomeRan" placeholder="0" oninput="saveIncomes(); updateBalanceDisplay();" onchange="saveIncomes()">
-                </div>
-            </div>
-            
-            <div style="text-align:center; padding-top:10px; border-top:1px solid #eee;">
-                <span style="font-weight: 500;">יתרה נשארת (הכנסות - הוצאות): </span>
-                <strong id="totalBalance" style="font-size:1.6rem; font-weight: 900;">...</strong>
-            </div>
-
-            <div id="paymentBalance" class="balance-info equal">
-                ...
-            </div>
-        </div>
-
-        <div class="card">
             <h3>חלוקה לפי קטגוריות</h3>
             <div class="chart-box">
                 <canvas id="expenseChart"></canvas>
             </div>
+            <p style="text-align:center; font-weight:bold; margin-top:20px;">סך כל ההוצאות החודשיות: <span id="totalMonthlySpent">...</span></p>
         </div>
 
         <div class="card" style="overflow-x: auto;">
@@ -323,9 +357,14 @@
     
     <div id="view-archive" class="view-section">
         <h2>ארכיון הוצאות חודשי</h2>
-        <div id="archive-content">
-            <p style="text-align:center">טוען ארכיון...</p>
+        
+        <div id="archive-month-list" class="archive-month-list">
+            </div>
+
+        <div id="archive-details-container">
+            <p style="text-align:center">בחר חודש מהרשימה למעלה.</p>
         </div>
+        
         <button onclick="showView('view-summary')" class="btn btn-back">חזרה לסיכום הנוכחי</button>
     </div>
 
@@ -352,47 +391,34 @@
     let myChart = null;
     let currentTotalSpent = 0;
     
-    // Total spent by each person (for balance calculation)
     let orlyTotalSpent = 0;
     let ranTotalSpent = 0;
-
+    
+    const MONTH_NAMES = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+    
     // --- 3. LIFECYCLE & MONTHLY LOGIC ---
 
     document.addEventListener('DOMContentLoaded', () => {
         initMonthlyData();
     });
 
-    function initMonthlyData() {
-        // 1. Load income values from Local Storage
-        const incomes = JSON.parse(localStorage.getItem('monthlyIncomes') || '{}');
-        document.getElementById('incomeOrly').value = incomes.Orly || '';
-        document.getElementById('incomeRan').value = incomes.Ran || '';
-        
-        // 2. Check for month change and handle archive
-        checkForNewMonth();
-        
-        // 3. Initial display (will be fully updated after loadData is called)
-        updateBalanceDisplay();
+    async function initMonthlyData() {
+        await checkForNewMonth();
     }
     
-    function saveIncomes() {
-        const incomes = {
-            Orly: parseFloat(document.getElementById('incomeOrly').value) || 0,
-            Ran: parseFloat(document.getElementById('incomeRan').value) || 0
-        };
-        localStorage.setItem('monthlyIncomes', JSON.stringify(incomes));
-    }
-
-    // (checkForNewMonth function remains the same)
     async function checkForNewMonth() {
         const today = new Date();
         const currentMonthKey = `${today.getFullYear()}-${today.getMonth() + 1}`;
         const lastMonthKey = localStorage.getItem('lastActiveMonth');
+        
+        if (!lastMonthKey) {
+            localStorage.setItem('lastActiveMonth', currentMonthKey);
+            return;
+        }
 
-        if (lastMonthKey && lastMonthKey !== currentMonthKey) {
+        if (lastMonthKey !== currentMonthKey) {
             console.warn(`New month detected! Archiving data for ${lastMonthKey}...`);
             
-            // 1. Get all current expenses to archive
             const currentExpensesSnapshot = await db.collection("expenses").get();
             const currentExpenses = [];
             currentExpensesSnapshot.forEach(doc => {
@@ -402,12 +428,10 @@
             });
 
             if (currentExpenses.length > 0) {
-                // 2. Save current expenses and income to Archive in Local Storage
                 const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
                 
                 archiveData[lastMonthKey] = {
                     date: lastMonthKey,
-                    incomes: JSON.parse(localStorage.getItem('monthlyIncomes') || '{}'),
                     expenses: currentExpenses,
                     totalSpent: currentExpenses.reduce((sum, exp) => sum + exp.amount, 0)
                 };
@@ -415,27 +439,16 @@
                 localStorage.setItem('monthlyArchive', JSON.stringify(archiveData));
                 console.log(`Month data for ${lastMonthKey} archived.`);
                 
-                // 3. Reset for the new month (SILENTLY)
-                localStorage.removeItem('monthlyIncomes'); 
-                document.getElementById('incomeOrly').value = ''; 
-                document.getElementById('incomeRan').value = '';
-
-                // 4. Delete documents from Firestore 
                 const docsToDelete = currentExpenses.map(doc => doc.id);
-                const deletePromises = docsToDelete.map(id => 
-                    db.collection("expenses").doc(id).delete().catch(err => console.error(`Error deleting ${id}:`, err))
-                );
-                await Promise.all(deletePromises);
+                const batch = db.batch();
+                docsToDelete.forEach(id => {
+                    batch.delete(db.collection("expenses").doc(id));
+                });
+                await batch.commit();
                 console.log('Current month expenses cleared from Firestore.');
 
-            } else {
-                localStorage.removeItem('monthlyIncomes');
-            }
+            } 
 
-            // 5. Update last active month
-            localStorage.setItem('lastActiveMonth', currentMonthKey);
-        } else if (!lastMonthKey) {
-            // First time load
             localStorage.setItem('lastActiveMonth', currentMonthKey);
         }
     }
@@ -461,99 +474,130 @@
         loadData('all'); 
     }
 
+    // --- 5. ARCHIVE VIEW LOGIC (MODIFIED: Show scrollable list of 12 months) ---
     async function showArchiveView() {
-        const archiveContent = document.getElementById('archive-content');
-        archiveContent.innerHTML = 'טוען ארכיון...';
+        const archiveListContainer = document.getElementById('archive-month-list');
+        const detailsContainer = document.getElementById('archive-details-container');
+        detailsContainer.innerHTML = '<p style="text-align:center">בחר חודש מהרשימה למעלה.</p>';
+        
         showView('view-archive');
 
         const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
-        const monthKeys = Object.keys(archiveData).sort().reverse();
-
-        if (monthKeys.length === 0) {
-            archiveContent.innerHTML = '<p style="text-align:center; font-weight:bold;">אין נתונים בארכיון.</p>';
-            return;
-        }
-
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonthIndex = today.getMonth(); // 0-11
+        archiveListContainer.innerHTML = '';
+        
         let html = '';
         
-        for (const monthKey of monthKeys) {
+        // Loop through the last 12 months (or more, depending on data available)
+        // We will show 12 items spanning the current year and parts of the previous one
+        for (let i = 0; i < 12; i++) {
+            let date = new Date(currentYear, currentMonthIndex - i, 1);
+            let year = date.getFullYear();
+            let month = date.getMonth() + 1;
+            let monthKey = `${year}-${month}`; // e.g., "2025-12"
+            
+            const isDataAvailable = archiveData[monthKey] !== undefined;
             const data = archiveData[monthKey];
+            const displayMonthName = MONTH_NAMES[date.getMonth()];
             
-            const parts = monthKey.split('-');
-            const year = parseInt(parts[0]);
-            const month = parseInt(parts[1]) - 1; 
-            const dateDisplay = new Date(year, month).toLocaleDateString('he-IL', { year: 'numeric', month: 'long' });
-            
-            // Calculate balance and who owes whom for archived month
-            const totalSpent = data.totalSpent;
-            const orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
-            const ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
-            const averageSpend = totalSpent / 2;
-            
-            let balanceText;
-            let balanceColor;
+            let balanceText = 'אין נתונים';
+            let balanceColor = '#7f8c8d';
+            let totalSpent = 0;
 
-            if (orlySpend > averageSpend) {
-                const diff = orlySpend - averageSpend;
-                balanceText = `אורלי צריכה לקבל ${diff.toFixed(2)} ₪ מרן`;
-                balanceColor = '#ff6b6b';
-            } else if (ranSpend > averageSpend) {
-                const diff = ranSpend - averageSpend;
-                balanceText = `רן צריך לקבל ${diff.toFixed(2)} ₪ מאורלי`;
-                balanceColor = '#4ecdc4';
-            } else {
-                balanceText = 'התשלום היה מאוזן או ללא יתרה לחלוקה.';
-                balanceColor = '#27ae60';
+            if (isDataAvailable) {
+                totalSpent = data.totalSpent;
+                const orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
+                const ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
+                const averageSpend = totalSpent / 2;
+                const diffOrly = orlySpend - averageSpend;
+
+                if (Math.abs(diffOrly) < 0.01) {
+                    balanceText = 'מאוזן';
+                    balanceColor = '#2ecc71';
+                } else if (diffOrly > 0) {
+                    balanceText = `אורלי הוציאה: ${orlySpend.toFixed(2)} ₪`;
+                    balanceColor = '#ff6b6b';
+                } else {
+                    balanceText = `רן הוציא: ${ranSpend.toFixed(2)} ₪`;
+                    balanceColor = '#4ecdc4';
+                }
             }
             
-            html += `<div class="card" style="border-right: 5px solid ${monthKey === monthKeys[0] ? 'var(--accent)' : 'var(--primary)'};">
-                <h3 style="margin-top:0; margin-bottom:10px;">🗓️ ארכיון: ${dateDisplay}</h3>
-                <p><strong>סך הוצאות:</strong> ${totalSpent.toFixed(2)} ₪</p>
-                <p style="font-weight: bold; color: ${balanceColor};">${balanceText}</p>
-                
-                <p style="margin-top:15px; font-size:0.9rem; color:#7f8c8d;">(אורלי הוציאה: ${orlySpend.toFixed(2)} ₪, רן הוציא: ${ranSpend.toFixed(2)} ₪)</p>
-                <button onclick="displayArchiveTable('${monthKey}')" class="btn btn-summary" style="padding: 10px; font-size:0.9rem;">הצג פירוט הוצאות</button>
-                <div id="archive-table-${monthKey}" style="display:none; margin-top:15px;"></div>
-                <button onclick="exportToCSV(archiveData['${monthKey}'].expenses, 'archive_${monthKey}')" class="btn btn-export" style="padding: 10px; font-size:0.9rem; margin-top:10px;">ייצא CSV</button>
-            </div>`;
+            html += `
+                <div class="archive-month-item ${!isDataAvailable ? 'disabled' : ''}" 
+                     style="border-color: ${isDataAvailable ? balanceColor : 'transparent'};"
+                     onclick="${isDataAvailable ? `displayArchiveDetails('${monthKey}', this)` : ''}">
+                    <h4>${displayMonthName} ${year}</h4>
+                    <p>${isDataAvailable ? `סה"כ: ${totalSpent.toFixed(2)} ₪` : 'אין נתונים'}</p>
+                </div>
+            `;
         }
         
-        archiveContent.innerHTML = html;
+        archiveListContainer.innerHTML = html;
         document.getElementById('summary-header').innerText = `ארכיון חודשי`;
     }
-
-    window.displayArchiveTable = (monthKey) => {
+    
+    window.displayArchiveDetails = (monthKey, element) => {
         const archiveData = JSON.parse(localStorage.getItem('monthlyArchive'));
-        const expenses = archiveData[monthKey].expenses;
-        const targetDiv = document.getElementById(`archive-table-${monthKey}`);
+        const data = archiveData[monthKey];
+        const expenses = data.expenses;
+        const totalSpent = data.totalSpent;
+        const detailsContainer = document.getElementById('archive-details-container');
+
+        // Reset active state for all month items
+        document.querySelectorAll('.archive-month-item').forEach(el => el.classList.remove('active-month'));
+        // Set active state for the clicked item
+        element.classList.add('active-month');
         
-        if (targetDiv.style.display === 'block') {
-            targetDiv.style.display = 'none';
-            return;
+        let orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
+        let ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
+        const averageSpend = totalSpent / 2;
+        const diffOrly = orlySpend - averageSpend;
+
+        let balanceSummary;
+        if (Math.abs(diffOrly) < 0.01) {
+            balanceSummary = 'ההוצאות היו מאוזנות לחלוטין. (הפרש 0 ₪)';
+        } else if (diffOrly > 0) {
+            balanceSummary = `אורלי הוציאה יותר: ההפרש הוא ${diffOrly.toFixed(2)} ₪`;
+        } else {
+            balanceSummary = `רן הוציא יותר: ההפרש הוא ${Math.abs(diffOrly).toFixed(2)} ₪`;
         }
 
-        let tableHtml = `<table style="font-size:0.8rem;">
-            <thead><tr><th>תאריך</th><th>שם</th><th>סיבה</th><th>סכום</th></tr></thead>
-            <tbody>`;
+        let html = `<div class="card archive-details">
+            <h3 style="margin-top:0; margin-bottom:15px; font-size:1.5rem;">סיכום חודש: ${MONTH_NAMES[parseInt(monthKey.split('-')[1]) - 1]} ${monthKey.split('-')[0]}</h3>
+            <p style="font-size: 1.1rem; font-weight: bold;">סה"כ הוצאות: ${totalSpent.toFixed(2)} ₪</p>
+            <p style="margin-bottom: 20px;">${balanceSummary}</p>
+
+            <p style="font-weight: bold;">פירוט הוצאות:</p>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead><tr><th>תאריך</th><th>שם</th><th>סיבה</th><th>סכום</th></tr></thead>
+                    <tbody>`;
             
         expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
         
-        expenses.forEach(data => {
-            tableHtml += `<tr>
-                <td>${data.date.split('-').reverse().join('/')}</td>
-                <td>${data.person === 'Orly' ? 'אורלי' : 'רן'}</td>
-                <td>${data.reason}</td>
-                <td class="amount-cell">${data.amount.toFixed(2)} ₪</td>
+        expenses.forEach(expense => {
+            html += `<tr>
+                <td>${expense.date.split('-').reverse().join('/')}</td>
+                <td>${expense.person === 'Orly' ? 'אורלי' : 'רן'}</td>
+                <td>${expense.reason}</td>
+                <td class="amount-cell">${expense.amount.toFixed(2)} ₪</td>
             </tr>`;
         });
         
-        tableHtml += '</tbody></table>';
-        targetDiv.innerHTML = tableHtml;
-        targetDiv.style.display = 'block';
+        html += `</tbody></table></div>`;
+        
+        // Add Export button
+        html += `<button onclick="exportToCSV(data.expenses, 'archive_${monthKey}')" class="btn btn-export" style="padding: 10px; font-size:0.9rem; margin-top:20px;">ייצא CSV</button></div>`;
+
+        detailsContainer.innerHTML = html;
+        detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
 
-    // --- 5. INPUT HANDLING ---
+    // --- 7. INPUT HANDLING (Unchanged) ---
     const form = document.getElementById('expenseForm');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -581,10 +625,8 @@
             });
 
             submitBtn.innerText = "נשמר!";
-            // Go to home view and then refresh summary data in the background
             setTimeout(() => { 
                 showView('view-home'); 
-                // Pre-load data for summary next time
                 loadData('all');
             }, 500);
             
@@ -597,7 +639,7 @@
         }
     });
 
-    // --- 6. SUMMARY & DELETE LOGIC ---
+    // --- 8. SUMMARY & DELETE LOGIC (Unchanged) ---
     async function loadData(filter) {
         currentFilter = filter; 
         const tbody = document.querySelector('#expenseTable tbody');
@@ -605,9 +647,6 @@
         
         let query = db.collection("expenses");
         
-        // --- INDEX FIX LOGIC ---
-        // For 'all' filter, only need to sort by date DESC.
-        // For person filter, need composite index (person ASC, date DESC).
         if(filter !== 'all') {
             query = query.where("person", "==", filter).orderBy("date", "desc");
         } else {
@@ -631,15 +670,13 @@
                 data.id = doc.id; 
                 allExpenses.push(data);
                 
-                // Track total spent for the entire collection (regardless of current filter for display)
                 if (data.person === 'Orly') {
                     orlyTotalSpent += data.amount;
                 } else if (data.person === 'Ran') {
                     ranTotalSpent += data.amount;
                 }
-                currentTotalSpent += data.amount; // Total of ALL items loaded
+                currentTotalSpent += data.amount; 
 
-                // Only display data matching the current filter (which is already done by the query)
                 const displayName = data.person === 'Orly' ? 'אורלי' : 'רן';
                 const row = `<tr>
                     <td>${data.date.split('-').reverse().join('/')}</td>
@@ -653,21 +690,19 @@
 
         } catch (error) {
             console.error("Firestore Query Error:", error);
-            // Display clear index error message
             if (error.code === 'failed-precondition' || error.message.includes('The query requires an index')) {
                 tbody.innerHTML = '<tr><td colspan="5" style="color:red; font-weight:bold; padding:20px;">שגיאה: חובה ליצור אינדקס ב-Firebase. יש לוודא שהוגדר: person ASC, date DESC</td></tr>';
             } else {
                 tbody.innerHTML = `<tr><td colspan="5" style="color:red; font-weight:bold;">שגיאה בטעינת הנתונים: ${error.message}</td></tr>`;
             }
             allExpenses = []; 
-            currentTotalSpent = 0; // Reset totals on major error
+            currentTotalSpent = 0; 
             orlyTotalSpent = 0;
             ranTotalSpent = 0;
         }
         
-        // Always update chart and balance display after data attempt
         updateChart(allExpenses); 
-        updateBalanceDisplay();
+        document.getElementById('totalMonthlySpent').innerText = currentTotalSpent.toFixed(2) + ' ₪';
     }
 
     window.deleteExpense = async (id) => {
@@ -677,7 +712,6 @@
 
         try {
             await db.collection("expenses").doc(id).delete();
-            // Refresh the list with the current filter
             loadData(currentFilter); 
 
         } catch (error) {
@@ -686,12 +720,11 @@
         }
     }
 
-    // --- 7. CHART LOGIC (Unchanged) ---
+    // --- 9. CHART LOGIC (Unchanged) ---
     function updateChart(data) {
         const categoryTotals = {};
         
-        // Use all expenses loaded to generate the pie chart
-        const expensesForChart = currentFilter === 'all' ? data : allExpenses; // Use all expenses if filtered, to show full breakdown
+        const expensesForChart = data; 
         
         expensesForChart.forEach(item => {
             const reason = item.reason; 
@@ -725,52 +758,7 @@
         });
     }
 
-    // --- 8. BALANCE CALCULATION (Major Update) ---
-    function updateBalanceDisplay() {
-        // 1. Calculate General Remaining Balance (Income - Total Spent)
-        const incOrly = parseFloat(document.getElementById('incomeOrly').value) || 0;
-        const incRan = parseFloat(document.getElementById('incomeRan').value) || 0;
-        
-        const generalBalance = (incOrly + incRan) - currentTotalSpent;
-        
-        const totalBalanceEl = document.getElementById('totalBalance');
-        totalBalanceEl.innerText = '₪' + generalBalance.toFixed(2);
-        totalBalanceEl.style.color = generalBalance >= 0 ? '#27ae60' : '#e74c3c';
-
-        // 2. Calculate Payment Balance (Who owes whom)
-        const paymentBalanceEl = document.getElementById('paymentBalance');
-        const averageSpend = currentTotalSpent / 2;
-        const diffOrly = orlyTotalSpent - averageSpend;
-
-        paymentBalanceEl.className = 'balance-info'; 
-        
-        if (currentTotalSpent === 0) {
-             paymentBalanceEl.classList.add('equal');
-             paymentBalanceEl.innerHTML = `טרם נרשמו הוצאות לחודש זה.`;
-        } else if (Math.abs(diffOrly) < 0.01) {
-            // Check for near zero difference
-            paymentBalanceEl.classList.add('equal');
-            paymentBalanceEl.innerHTML = `ההוצאות מאוזנות! סך כל הוצאות: ${currentTotalSpent.toFixed(2)} ₪.`;
-        } else if (diffOrly > 0) {
-            // Orly spent more, Ran owes Orly
-            const ranOwes = diffOrly.toFixed(2);
-            paymentBalanceEl.classList.add('ran-owes');
-            paymentBalanceEl.innerHTML = `
-                💰 **רן חייב לאורלי:** ${ranOwes} ₪ <br> 
-                (אורלי הוציאה: ${orlyTotalSpent.toFixed(2)} ₪, רן הוציא: ${ranTotalSpent.toFixed(2)} ₪)
-            `;
-        } else {
-            // Ran spent more, Orly owes Ran
-            const orlyOwes = Math.abs(diffOrly).toFixed(2);
-            paymentBalanceEl.classList.add('orly-owes');
-            paymentBalanceEl.innerHTML = `
-                💰 **אורלי חייבת לרן:** ${orlyOwes} ₪ <br> 
-                (אורלי הוציאה: ${orlyTotalSpent.toFixed(2)} ₪, רן הוציא: ${ranTotalSpent.toFixed(2)} ₪)
-            `;
-        }
-    }
-
-    // --- 9. EXPORT (Unchanged) ---
+    // --- 10. EXPORT (FIXED) ---
     function exportToCSV(data, filenamePrefix) {
         if(data.length === 0) { alert("אין נתונים לייצוא"); return; }
 
@@ -778,17 +766,21 @@
         data.forEach(row => {
             const safeReason = row.reason.replace(/"/g, '""');
             const displayName = row.person === 'Orly' ? 'אורלי' : 'רן';
-            csv += `${row.date},${displayName},"${safeReason}",${row.amount}\n`;
+            csv += `${row.date},${displayName},"${safeReason}",${row.amount.toFixed(2)}\n`; 
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
+        
         const link = document.createElement("a");
         link.setAttribute("href", url);
         link.setAttribute("download", `${filenamePrefix}_expenses_${new Date().toISOString().slice(0,10)}.csv`);
+        
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        URL.revokeObjectURL(url);
     }
 </script>
 </body>
