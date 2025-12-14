@@ -11,7 +11,7 @@
 
     <style>
         /* --- CSS STYLES --- */
-        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght=300;400;500;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700;900&display=swap');
 
         :root {
             --primary: #4a90e2;   
@@ -244,24 +244,6 @@
             background: #fff8e1;
             box-shadow: 0 4px 10px rgba(245, 166, 35, 0.2);
         }
-        
-        .archive-month-item.disabled {
-            background: #e0e0e0;
-            cursor: default;
-            opacity: 0.7;
-            pointer-events: none; 
-        }
-
-        .archive-details {
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #eee;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        .archive-details button {
-            margin-top: 10px;
-        }
-
     </style>
 </head>
 <body>
@@ -351,7 +333,7 @@
         </div>
 
         <button onclick="showArchiveView()" class="btn btn-archive">צפייה בארכיון חודשים קודמים</button>
-        <button onclick="exportToCSV(allExpenses, 'current_month')" class="btn btn-export">ייצא לאקסל (CSV)</button>
+        <button onclick="exportToCSV(allExpenses, 'current_month')" class="btn btn-export">ייצא נתונים (CSV) ל-Google Sheets / Excel</button>
         <button onclick="showView('view-home')" class="btn btn-back">חזרה לראשי</button>
     </div>
     
@@ -474,8 +456,11 @@
         loadData('all'); 
     }
 
-    // --- 5. ARCHIVE VIEW LOGIC (MODIFIED: Show scrollable list of 12 months) ---
+    // --- 5. ARCHIVE VIEW LOGIC (FIXED: Includes only months with data) ---
     async function showArchiveView() {
+        // 1. Ensure current month data is loaded from Firestore
+        await loadData('all'); 
+        
         const archiveListContainer = document.getElementById('archive-month-list');
         const detailsContainer = document.getElementById('archive-details-container');
         detailsContainer.innerHTML = '<p style="text-align:center">בחר חודש מהרשימה למעלה.</p>';
@@ -485,28 +470,48 @@
         const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
         const today = new Date();
         const currentYear = today.getFullYear();
-        const currentMonthIndex = today.getMonth(); // 0-11
+        const currentMonth = today.getMonth() + 1; // 1-12
+        const currentMonthKey = `${currentYear}-${currentMonth}`;
+
+        // Get all unique month keys from archive and ensure current month is included
+        const monthKeys = new Set(Object.keys(archiveData));
+        monthKeys.add(currentMonthKey);
+        
+        // Convert to array and sort chronologically (reverse: newest first)
+        const sortedKeys = Array.from(monthKeys).sort((a, b) => {
+            const dateA = new Date(a.split('-')[0], a.split('-')[1] - 1);
+            const dateB = new Date(b.split('-')[0], b.split('-')[1] - 1);
+            return dateB - dateA;
+        });
+
         archiveListContainer.innerHTML = '';
         
         let html = '';
+        let initialClickHandler = ''; 
+        let monthsWithData = []; // To track months that actually have data
+
         
-        // Loop through the last 12 months (or more, depending on data available)
-        // We will show 12 items spanning the current year and parts of the previous one
-        for (let i = 0; i < 12; i++) {
-            let date = new Date(currentYear, currentMonthIndex - i, 1);
-            let year = date.getFullYear();
-            let month = date.getMonth() + 1;
-            let monthKey = `${year}-${month}`; // e.g., "2025-12"
+        for (const monthKey of sortedKeys) {
+            const parts = monthKey.split('-');
+            const year = parseInt(parts[0]);
+            const monthIndex = parseInt(parts[1]) - 1; 
             
-            const isDataAvailable = archiveData[monthKey] !== undefined;
-            const data = archiveData[monthKey];
-            const displayMonthName = MONTH_NAMES[date.getMonth()];
-            
+            const isCurrentMonth = monthKey === currentMonthKey;
+            const isArchivedDataAvailable = archiveData[monthKey] !== undefined;
+
+            let totalSpent = 0;
             let balanceText = 'אין נתונים';
             let balanceColor = '#7f8c8d';
-            let totalSpent = 0;
 
-            if (isDataAvailable) {
+            if (isArchivedDataAvailable) {
+                // Archived Month
+                const data = archiveData[monthKey];
+                
+                // --- CRITICAL FIX 1: Skip if archived data is corrupted or total is 0
+                if (!data || typeof data.totalSpent !== 'number' || isNaN(data.totalSpent) || data.totalSpent === 0) {
+                    continue; 
+                }
+                
                 totalSpent = data.totalSpent;
                 const orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
                 const ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
@@ -517,56 +522,147 @@
                     balanceText = 'מאוזן';
                     balanceColor = '#2ecc71';
                 } else if (diffOrly > 0) {
-                    balanceText = `אורלי הוציאה: ${orlySpend.toFixed(2)} ₪`;
+                    balanceText = `אורלי: ${orlySpend.toFixed(2)} ₪`;
                     balanceColor = '#ff6b6b';
                 } else {
-                    balanceText = `רן הוציא: ${ranSpend.toFixed(2)} ₪`;
+                    balanceText = `רן: ${ranSpend.toFixed(2)} ₪`;
                     balanceColor = '#4ecdc4';
                 }
+                
+            } else if (isCurrentMonth) {
+                // Current Month (using live data)
+                totalSpent = currentTotalSpent;
+                
+                // --- CRITICAL FIX 2: Skip if current month total is 0
+                if (totalSpent === 0) {
+                    continue; 
+                }
+
+                if (totalSpent > 0) {
+                    const averageSpend = totalSpent / 2;
+                    const diffOrly = orlyTotalSpent - averageSpend;
+
+                    if (Math.abs(diffOrly) < 0.01) {
+                        balanceText = 'מאוזן';
+                        balanceColor = '#2ecc71';
+                    } else if (diffOrly > 0) {
+                        balanceText = `אורלי: ${orlyTotalSpent.toFixed(2)} ₪`;
+                        balanceColor = '#ff6b6b';
+                    } else {
+                        balanceText = `רן: ${ranTotalSpent.toFixed(2)} ₪`;
+                        balanceColor = '#4ecdc4';
+                    }
+                    
+                    // Set the current month as the initial active selection if it has data
+                    if (!initialClickHandler) {
+                        initialClickHandler = `displayArchiveDetails('${monthKey}', document.getElementById('month-${monthKey}'), true)`;
+                    }
+                    
+                } else {
+                     balanceText = 'לחץ לפרטים';
+                     balanceColor = 'var(--primary)';
+                }
+            } else {
+                // Skip any month key that is neither archived nor the current month
+                continue;
             }
             
+            // If we reached here, the month has data, so we add it to the list
+            monthsWithData.push(monthKey);
+
+            const clickHandler = `displayArchiveDetails('${monthKey}', this, ${isCurrentMonth})`;
+            
             html += `
-                <div class="archive-month-item ${!isDataAvailable ? 'disabled' : ''}" 
-                     style="border-color: ${isDataAvailable ? balanceColor : 'transparent'};"
-                     onclick="${isDataAvailable ? `displayArchiveDetails('${monthKey}', this)` : ''}">
-                    <h4>${displayMonthName} ${year}</h4>
-                    <p>${isDataAvailable ? `סה"כ: ${totalSpent.toFixed(2)} ₪` : 'אין נתונים'}</p>
+                <div class="archive-month-item" 
+                     id="month-${monthKey}" 
+                     style="border-color: ${balanceColor};"
+                     onclick="${clickHandler}">
+                    <h4>${MONTH_NAMES[monthIndex]} ${year}</h4>
+                    <p>${totalSpent.toFixed(2)} ₪</p>
                 </div>
             `;
         }
         
         archiveListContainer.innerHTML = html;
         document.getElementById('summary-header').innerText = `ארכיון חודשי`;
+        
+        // --- Selection Logic ---
+        if (initialClickHandler) {
+            // Automatically select the current month if it has data and was set as initial
+            setTimeout(() => {
+                const initialElement = document.getElementById(`month-${currentMonthKey}`);
+                if (initialElement) {
+                   displayArchiveDetails(currentMonthKey, initialElement, true);
+                }
+            }, 50);
+        } else if (monthsWithData.length > 0) {
+             // If current month has no data, select the newest archived month (which is the first in sortedKeys)
+             setTimeout(() => {
+                const firstMonthKey = monthsWithData[0];
+                const firstElement = document.getElementById(`month-${firstMonthKey}`);
+                if (firstElement) {
+                   const isFirstCurrent = firstMonthKey === currentMonthKey;
+                   displayArchiveDetails(firstMonthKey, firstElement, isFirstCurrent);
+                }
+            }, 50);
+        }
     }
     
-    window.displayArchiveDetails = (monthKey, element) => {
-        const archiveData = JSON.parse(localStorage.getItem('monthlyArchive'));
-        const data = archiveData[monthKey];
-        const expenses = data.expenses;
-        const totalSpent = data.totalSpent;
-        const detailsContainer = document.getElementById('archive-details-container');
+    // --- 6. DISPLAY ARCHIVE DETAILS (Unchanged for logic) ---
+    window.displayArchiveDetails = async (monthKey, element, isCurrentMonth) => {
+        let expenses;
+        let totalSpent;
 
         // Reset active state for all month items
         document.querySelectorAll('.archive-month-item').forEach(el => el.classList.remove('active-month'));
         // Set active state for the clicked item
         element.classList.add('active-month');
+
+        const detailsContainer = document.getElementById('archive-details-container');
+        detailsContainer.innerHTML = '<p style="text-align:center">טוען נתונים...</p>';
         
-        let orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
-        let ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
+        if (isCurrentMonth) {
+            await loadData('all'); 
+            expenses = allExpenses;
+            totalSpent = currentTotalSpent;
+        } else {
+            const archiveData = JSON.parse(localStorage.getItem('monthlyArchive'));
+            if (!archiveData[monthKey]) {
+                detailsContainer.innerHTML = '<p style="text-align:center; color:red;">שגיאה בטעינת נתוני ארכיון.</p>';
+                return;
+            }
+            const data = archiveData[monthKey];
+            expenses = data.expenses;
+            totalSpent = data.totalSpent;
+        }
+        
+        if (expenses.length === 0) {
+            detailsContainer.innerHTML = `<div class="card archive-details"><h3 style="margin-top:0;">${isCurrentMonth ? 'חודש נוכחי' : 'ארכיון'}</h3><p style="text-align:center;">אין הוצאות לחודש זה.</p></div>`;
+            detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+        
+        // Calculate balance
+        let orlySpend = expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
+        let ranSpend = expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
         const averageSpend = totalSpent / 2;
         const diffOrly = orlySpend - averageSpend;
 
         let balanceSummary;
         if (Math.abs(diffOrly) < 0.01) {
-            balanceSummary = 'ההוצאות היו מאוזנות לחלוטין. (הפרש 0 ₪)';
+            balanceSummary = 'ההוצאות היו מאוזנות לחלוטין.';
         } else if (diffOrly > 0) {
             balanceSummary = `אורלי הוציאה יותר: ההפרש הוא ${diffOrly.toFixed(2)} ₪`;
         } else {
             balanceSummary = `רן הוציא יותר: ההפרש הוא ${Math.abs(diffOrly).toFixed(2)} ₪`;
         }
+        
+        const parts = monthKey.split('-');
+        const monthDisplay = MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0];
+
 
         let html = `<div class="card archive-details">
-            <h3 style="margin-top:0; margin-bottom:15px; font-size:1.5rem;">סיכום חודש: ${MONTH_NAMES[parseInt(monthKey.split('-')[1]) - 1]} ${monthKey.split('-')[0]}</h3>
+            <h3 style="margin-top:0; margin-bottom:15px; font-size:1.5rem;">סיכום חודש: ${monthDisplay}</h3>
             <p style="font-size: 1.1rem; font-weight: bold;">סה"כ הוצאות: ${totalSpent.toFixed(2)} ₪</p>
             <p style="margin-bottom: 20px;">${balanceSummary}</p>
 
@@ -589,8 +685,7 @@
         
         html += `</tbody></table></div>`;
         
-        // Add Export button
-        html += `<button onclick="exportToCSV(data.expenses, 'archive_${monthKey}')" class="btn btn-export" style="padding: 10px; font-size:0.9rem; margin-top:20px;">ייצא CSV</button></div>`;
+        html += `<button onclick="exportToCSV(expenses, 'archive_${monthKey}')" class="btn btn-export">ייצא נתונים (CSV) ל-Google Sheets / Excel</button></div>`;
 
         detailsContainer.innerHTML = html;
         detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -682,7 +777,7 @@
                     <td>${data.date.split('-').reverse().join('/')}</td>
                     <td>${displayName}</td>
                     <td>${data.reason}</td>
-                    <td class="amount-cell">${data.amount.toFixed(2)} ₪</td>
+                    <td class="amount-cell">${data.amount.toFixed(2)} ₪}</td>
                     <td><button class="btn-delete" onclick="deleteExpense('${data.id}')">❌</button></td>
                 </tr>`;
                 tbody.innerHTML += row;
@@ -724,16 +819,22 @@
     function updateChart(data) {
         const categoryTotals = {};
         
-        const expensesForChart = data; 
-        
-        expensesForChart.forEach(item => {
-            const reason = item.reason; 
-            if(!categoryTotals[reason]) categoryTotals[reason] = 0;
-            categoryTotals[reason] += item.amount;
+        data.forEach(item => {
+            if (item.reason && typeof item.reason === 'string' && item.amount > 0 && typeof item.amount === 'number' && !isNaN(item.amount)) {
+                const reason = item.reason; 
+                if(!categoryTotals[reason]) categoryTotals[reason] = 0;
+                categoryTotals[reason] += item.amount;
+            }
         });
 
         const ctx = document.getElementById('expenseChart').getContext('2d');
         if(myChart) myChart.destroy();
+        
+        if (Object.keys(categoryTotals).length === 0) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            return;
+        }
+
 
         myChart = new Chart(ctx, {
             type: 'pie',
@@ -758,15 +859,16 @@
         });
     }
 
-    // --- 10. EXPORT (FIXED) ---
-    function exportToCSV(data, filenamePrefix) {
+    // --- 10. EXPORT (CSV - Unchanged) ---
+    window.exportToCSV = (data, filenamePrefix) => {
         if(data.length === 0) { alert("אין נתונים לייצוא"); return; }
 
         let csv = "\uFEFFתאריך,שם,סיבה,סכום\n"; 
         data.forEach(row => {
-            const safeReason = row.reason.replace(/"/g, '""');
+            const safeReason = row.reason ? row.reason.replace(/"/g, '""') : 'ללא סיבה';
             const displayName = row.person === 'Orly' ? 'אורלי' : 'רן';
-            csv += `${row.date},${displayName},"${safeReason}",${row.amount.toFixed(2)}\n`; 
+            const amount = typeof row.amount === 'number' && !isNaN(row.amount) ? row.amount.toFixed(2) : '0.00';
+            csv += `${row.date},${displayName},"${safeReason}",${amount}\n`; 
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
