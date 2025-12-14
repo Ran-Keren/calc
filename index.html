@@ -183,9 +183,19 @@
         td { font-weight: 500; }
         .amount-cell { font-weight: 700; color: var(--dark); direction: ltr; }
 
-        /* Filter Tabs */
-        .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
-        .filter-tabs .btn { margin: 0; padding: 12px; font-size: 1rem; font-weight: 600; flex-grow: 1; }
+        /* Filter Tabs - Style for horizontal and smaller buttons */
+        .filter-tabs { 
+            display: flex; 
+            gap: 8px; 
+            margin-bottom: 15px; 
+        }
+        .filter-tabs .btn { 
+            margin: 0; 
+            padding: 12px; /* Smaller padding */
+            font-size: 1rem; /* Smaller font */
+            font-weight: 600; 
+            flex-grow: 1; /* Ensure they share space equally */
+        }
 
         /* Archive View Specific Style */
         #view-archive table th, #view-archive table td {
@@ -199,13 +209,20 @@
             padding: 40px 20px;
         }
         
-        /* Archive List Scroll Styling */
+        /* Archive List Scroll Styling - UPDATED FOR CENTERED ALIGNMENT */
         .archive-month-list {
             display: flex;
-            overflow-x: scroll; /* Enable horizontal scrolling */
+            flex-wrap: nowrap;
+            justify-content: center; /* CENTER THE ITEMS */
+            overflow-x: auto; 
             gap: 10px;
-            padding-bottom: 15px; /* Space for scrollbar */
+            padding-bottom: 15px; 
             margin-bottom: 20px;
+            /* Adjust margins and padding to align center better within container */
+            padding-left: 20px; 
+            padding-right: 20px;
+            margin-left: -20px; 
+            margin-right: -20px;
         }
         .archive-month-list::-webkit-scrollbar {
             height: 5px;
@@ -299,7 +316,7 @@
     </div>
 
     <div id="view-summary" class="view-section">
-        <h2 id="summary-header">סיכום חודש נוכחי</h2>
+        <h2 id="summary-header">סיכום הוצאות</h2>
 
         <div class="filter-tabs">
             <button class="btn btn-summary" onclick="loadData('all')">כולם</button>
@@ -333,7 +350,15 @@
         </div>
 
         <button onclick="showArchiveView()" class="btn btn-archive">צפייה בארכיון חודשים קודמים</button>
-        <button onclick="exportToCSV(allExpenses, 'current_month')" class="btn btn-export">ייצא נתונים (CSV) ל-Google Sheets / Excel</button>
+        <button onclick="exportToSheets(allExpenses)" class="btn btn-export">פתח ב-Google Sheets (העתק + הדבק)</button>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="monthSelect">בחר חודש</label>
+                <select id="monthSelect" onchange="loadData(currentFilter)" style="width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 10px; font-size: 1.2rem; font-family: inherit; background: #fafafa;">
+                    </select>
+            </div>
+        </div>
         <button onclick="showView('view-home')" class="btn btn-back">חזרה לראשי</button>
     </div>
     
@@ -369,7 +394,7 @@
     // --- 2. APP STATE VARIABLES ---
     let currentFilter = 'all'; 
     let currentUser = ""; 
-    let allExpenses = [];
+    let allExpenses = []; // Holds expenses for the currently displayed month (Summary OR Archive)
     let myChart = null;
     let currentTotalSpent = 0;
     
@@ -378,63 +403,40 @@
     
     const MONTH_NAMES = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
     
-    // --- 3. LIFECYCLE & MONTHLY LOGIC ---
-
-    document.addEventListener('DOMContentLoaded', () => {
-        initMonthlyData();
-    });
-
-    async function initMonthlyData() {
-        await checkForNewMonth();
-    }
+    // --- 3. UTILITY FUNCTIONS ---
     
-    async function checkForNewMonth() {
-        const today = new Date();
-        const currentMonthKey = `${today.getFullYear()}-${today.getMonth() + 1}`;
-        const lastMonthKey = localStorage.getItem('lastActiveMonth');
+    /**
+     * Calculates the start and end date strings (YYYY-MM-DD) for a given month.
+     * @param {number} year 
+     * @param {number} month - 1 (January) to 12 (December)
+     * @returns {{start: string, end: string}}
+     */
+    function getStartAndEndOfMonth(year, month) {
+        const paddedMonth = String(month).padStart(2, '0');
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+
+        // Get the last day of the current month by asking for the day before the 1st of the next month
+        const endDay = new Date(year, month, 0).getDate(); 
+        const end = `${year}-${paddedMonth}-${endDay}`; 
         
-        if (!lastMonthKey) {
-            localStorage.setItem('lastActiveMonth', currentMonthKey);
-            return;
-        }
-
-        if (lastMonthKey !== currentMonthKey) {
-            console.warn(`New month detected! Archiving data for ${lastMonthKey}...`);
-            
-            const currentExpensesSnapshot = await db.collection("expenses").get();
-            const currentExpenses = [];
-            currentExpensesSnapshot.forEach(doc => {
-                const data = doc.data();
-                data.id = doc.id;
-                currentExpenses.push(data);
-            });
-
-            if (currentExpenses.length > 0) {
-                const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
-                
-                archiveData[lastMonthKey] = {
-                    date: lastMonthKey,
-                    expenses: currentExpenses,
-                    totalSpent: currentExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-                };
-                
-                localStorage.setItem('monthlyArchive', JSON.stringify(archiveData));
-                console.log(`Month data for ${lastMonthKey} archived.`);
-                
-                const docsToDelete = currentExpenses.map(doc => doc.id);
-                const batch = db.batch();
-                docsToDelete.forEach(id => {
-                    batch.delete(db.collection("expenses").doc(id));
-                });
-                await batch.commit();
-                console.log('Current month expenses cleared from Firestore.');
-
-            } 
-
-            localStorage.setItem('lastActiveMonth', currentMonthKey);
-        }
+        const start = `${year}-${paddedMonth}-01`;
+        
+        return { start, end };
     }
     
+    /**
+     * Calculates the start and end date strings (YYYY-MM-DD) for a given month key.
+     * @param {string} monthKey - Format YYYY-M (e.g., "2023-11")
+     * @returns {{start: string, end: string}}
+     */
+    function getRangeFromMonthKey(monthKey) {
+        const [yearStr, monthStr] = monthKey.split('-');
+        const year = parseInt(yearStr);
+        const month = parseInt(monthStr); // 1-12
+        return getStartAndEndOfMonth(year, month);
+    }
+
     // --- 4. NAVIGATION LOGIC ---
     function showView(viewId) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -451,126 +453,272 @@
     }
 
     function goToSummary() {
-        document.getElementById('summary-header').innerText = `סיכום חודש נוכחי`;
+        document.getElementById('summary-header').innerText = `סיכום הוצאות`;
         showView('view-summary');
-        loadData('all'); 
+        
+        // קביעת החודש הנוכחי כברירת מחדל (אם אין חודש נבחר)
+        const today = new Date();
+        const initialKey = `${today.getFullYear()}-${today.getMonth() + 1}`;
+        
+        // טעינת רשימת החודשים ואז טעינת הנתונים
+        populateMonthSelect('monthSelect', initialKey).then(() => {
+            loadData('all'); 
+        });
     }
 
-    // --- 5. ARCHIVE VIEW LOGIC (FIXED: Includes only months with data) ---
-    async function showArchiveView() {
-        // 1. Ensure current month data is loaded from Firestore
-        await loadData('all'); 
+    // --- 5. SUMMARY DATA LOADING (Selected Month) ---
+    async function loadData(filter) {
+        currentFilter = filter; 
+        const tbody = document.querySelector('#expenseTable tbody');
+        tbody.innerHTML = '<tr><td colspan="5">טוען נתונים...</td></tr>'; 
         
+        const monthSelectEl = document.getElementById('monthSelect');
+        const selectedMonthKey = monthSelectEl ? monthSelectEl.value : null;
+
+        let startRange, endRange;
+        let headerText = 'סיכום חודש נוכחי';
+
+        if (selectedMonthKey && selectedMonthKey !== '') {
+            // אם נבחר חודש, השתמש בטווח של חודש זה
+            const range = getRangeFromMonthKey(selectedMonthKey);
+            startRange = range.start;
+            endRange = range.end;
+
+            const [yearStr, monthStr] = selectedMonthKey.split('-');
+            const monthIndex = parseInt(monthStr) - 1;
+            headerText = `סיכום: ${MONTH_NAMES[monthIndex]} ${yearStr}`;
+        } else {
+            // ברירת מחדל: החודש הנוכחי (למקרה שה-select עדיין לא אוכלס או שנבחר ריק)
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const range = getStartAndEndOfMonth(year, month);
+            startRange = range.start;
+            endRange = range.end;
+            headerText = `סיכום חודש נוכחי`;
+        }
+        
+        document.getElementById('summary-header').innerText = headerText; // עדכון הכותרת
+
+        let query = db.collection("expenses");
+        
+        // 1. Filter by Selected Month Date Range
+        query = query.where("date", ">=", startRange).where("date", "<=", endRange);
+
+        // 2. Apply person filter and final order
+        if(filter !== 'all') {
+            // NOTE: This requires a composite index on (person, date) in Firebase!
+            query = query.where("person", "==", filter).orderBy("date", "desc");
+        } else {
+            query = query.orderBy("date", "desc");
+        }
+
+        try {
+            const snapshot = await query.get();
+            allExpenses = [];
+            currentTotalSpent = 0;
+            orlyTotalSpent = 0;
+            ranTotalSpent = 0;
+            tbody.innerHTML = ''; 
+
+            if (snapshot.empty) {
+                tbody.innerHTML = '<tr><td colspan="5">אין נתונים להצגה עבור מסנן זה</td></tr>';
+            }
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id; 
+                allExpenses.push(data);
+                
+                // Safety check for NaN
+                const amount = data.amount || 0;
+                
+                if (data.person === 'Orly') {
+                    orlyTotalSpent += amount;
+                } else if (data.person === 'Ran') {
+                    ranTotalSpent += amount;
+                }
+                currentTotalSpent += amount; 
+
+                const displayName = data.person === 'Orly' ? 'אורלי' : 'רן';
+                const row = `<tr>
+                    <td>${data.date.split('-').reverse().join('/')}</td>
+                    <td>${displayName}</td>
+                    <td>${data.reason}</td>
+                    <td class="amount-cell">${amount.toFixed(2)} ₪}</td>
+                    <td><button class="btn-delete" onclick="deleteExpense('${data.id}')">❌</button></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+        } catch (error) {
+            console.error("Firestore Query Error:", error);
+            if (error.code === 'failed-precondition' || error.message.includes('The query requires an index')) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color:red; font-weight:bold; padding:20px;">שגיאה: חובה ליצור אינדקס ב-Firebase. יש לוודא שהוגדר: person ASC, date DESC</td></tr>';
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" style="color:red; font-weight:bold;">שגיאה בטעינת הנתונים: ${error.message}</td></tr>`;
+            }
+            allExpenses = []; 
+            currentTotalSpent = 0; 
+            orlyTotalSpent = 0;
+            ranTotalSpent = 0;
+        }
+        
+        updateChart(allExpenses); 
+        document.getElementById('totalMonthlySpent').innerText = currentTotalSpent.toFixed(2) + ' ₪';
+    }
+    
+    window.deleteExpense = async (id) => {
+        if (!confirm("האם אתה בטוח שברצונך למחוק הוצאה זו?")) {
+            return;
+        }
+
+        try {
+            await db.collection("expenses").doc(id).delete();
+            loadData(currentFilter); // Reload current summary data
+
+        } catch (error) {
+            console.error("Error deleting document:", error);
+            alert("שגיאה במחיקת ההוצאה: " + error.message);
+        }
+    }
+
+
+    // --- 6. ARCHIVE VIEW LOGIC (Fetches month grouping from ALL Firebase data) ---
+    
+    async function getAllAvailableMonths() {
+        const availableMonths = {}; // Key: YYYY-M, Value: { total: 0, orly: 0, ran: 0 }
+        
+        try {
+            const snapshot = await db.collection("expenses")
+                .orderBy('date', 'desc')
+                .get();
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // Ensure date is valid for split, month is 1-padded (e.g., 01, 12)
+                const [year, month] = data.date.split('-'); 
+                // The key should be YYYY-M (non-padded for consistency, though split works either way)
+                const monthKey = `${year}-${parseInt(month)}`; 
+                const amount = data.amount || 0;
+                const person = data.person;
+
+                if (amount > 0) {
+                    if (!availableMonths[monthKey]) {
+                        availableMonths[monthKey] = { total: 0, orly: 0, ran: 0 };
+                    }
+                    
+                    availableMonths[monthKey].total += amount;
+                    if (person === 'Orly') {
+                        availableMonths[monthKey].orly += amount;
+                    } else if (person === 'Ran') {
+                        availableMonths[monthKey].ran += amount;
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error fetching all expenses for archive view:", error);
+        }
+        
+        // Convert to sorted array of keys (newest first)
+        return Object.keys(availableMonths).sort((a, b) => {
+            const dateA = new Date(a.split('-')[0], a.split('-')[1] - 1);
+            const dateB = new Date(b.split('-')[0], b.split('-')[1] - 1);
+            return dateB - dateA;
+        }).map(monthKey => ({
+            key: monthKey,
+            data: availableMonths[monthKey]
+        }));
+    }
+    
+    // --- Function to populate Month Select (Used in goToSummary) ---
+    async function populateMonthSelect(selectElementId, initialMonthKey) {
+        const selectEl = document.getElementById(selectElementId);
+        selectEl.innerHTML = '<option value="">טוען חודשים...</option>';
+        
+        // Get unique months with expenses
+        const availableMonths = await getAllAvailableMonths(); 
+        
+        selectEl.innerHTML = '';
+        
+        if (availableMonths.length === 0) {
+            selectEl.innerHTML = '<option value="">אין חודשים זמינים</option>';
+            return;
+        }
+
+        // Populate the select element
+        availableMonths.forEach(monthItem => {
+            const monthKey = monthItem.key; // Format YYYY-M
+            const [yearStr, monthStr] = monthKey.split('-');
+            const monthIndex = parseInt(monthStr) - 1; 
+            const monthDisplay = `${MONTH_NAMES[monthIndex]} ${yearStr}`;
+
+            const option = document.createElement('option');
+            option.value = monthKey;
+            option.textContent = monthDisplay;
+            selectEl.appendChild(option);
+        });
+        
+        // Select the initial month (usually the newest)
+        if (initialMonthKey && document.querySelector(`#${selectElementId} option[value="${initialKey}"]`)) {
+            selectEl.value = initialMonthKey;
+        } else if(availableMonths.length > 0) {
+            selectEl.value = availableMonths[0].key;
+        }
+    }
+
+
+    async function showArchiveView() {
         const archiveListContainer = document.getElementById('archive-month-list');
         const detailsContainer = document.getElementById('archive-details-container');
         detailsContainer.innerHTML = '<p style="text-align:center">בחר חודש מהרשימה למעלה.</p>';
         
         showView('view-archive');
 
-        const archiveData = JSON.parse(localStorage.getItem('monthlyArchive') || '{}');
-        const today = new Date();
-        const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth() + 1; // 1-12
-        const currentMonthKey = `${currentYear}-${currentMonth}`;
-
-        // Get all unique month keys from archive and ensure current month is included
-        const monthKeys = new Set(Object.keys(archiveData));
-        monthKeys.add(currentMonthKey);
+        const availableMonths = await getAllAvailableMonths();
         
-        // Convert to array and sort chronologically (reverse: newest first)
-        const sortedKeys = Array.from(monthKeys).sort((a, b) => {
-            const dateA = new Date(a.split('-')[0], a.split('-')[1] - 1);
-            const dateB = new Date(b.split('-')[0], b.split('-')[1] - 1);
-            return dateB - dateA;
-        });
-
         archiveListContainer.innerHTML = '';
         
         let html = '';
-        let initialClickHandler = ''; 
-        let monthsWithData = []; // To track months that actually have data
+        let initialKey = null;
 
+        if (availableMonths.length === 0) {
+            archiveListContainer.innerHTML = '<p style="text-align:center;">אין נתונים בארכיון.</p>';
+            return;
+        }
         
-        for (const monthKey of sortedKeys) {
-            const parts = monthKey.split('-');
-            const year = parseInt(parts[0]);
-            const monthIndex = parseInt(parts[1]) - 1; 
+        // Determine the initial selected month (the newest one)
+        if (availableMonths.length > 0) {
+            initialKey = availableMonths[0].key;
+        }
+        
+        for (const monthItem of availableMonths) {
+            const monthKey = monthItem.key;
+            const data = monthItem.data;
+            const [year, monthStr] = monthKey.split('-');
+            const monthIndex = parseInt(monthStr) - 1; 
             
-            const isCurrentMonth = monthKey === currentMonthKey;
-            const isArchivedDataAvailable = archiveData[monthKey] !== undefined;
+            const totalSpent = data.total;
+            const orlySpend = data.orly;
+            const ranSpend = data.ran;
+            const averageSpend = totalSpent / 2;
+            const diffOrly = orlySpend - averageSpend;
 
-            let totalSpent = 0;
-            let balanceText = 'אין נתונים';
-            let balanceColor = '#7f8c8d';
+            let balanceText;
+            let balanceColor;
 
-            if (isArchivedDataAvailable) {
-                // Archived Month
-                const data = archiveData[monthKey];
-                
-                // --- CRITICAL FIX 1: Skip if archived data is corrupted or total is 0
-                if (!data || typeof data.totalSpent !== 'number' || isNaN(data.totalSpent) || data.totalSpent === 0) {
-                    continue; 
-                }
-                
-                totalSpent = data.totalSpent;
-                const orlySpend = data.expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
-                const ranSpend = data.expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
-                const averageSpend = totalSpent / 2;
-                const diffOrly = orlySpend - averageSpend;
-
-                if (Math.abs(diffOrly) < 0.01) {
-                    balanceText = 'מאוזן';
-                    balanceColor = '#2ecc71';
-                } else if (diffOrly > 0) {
-                    balanceText = `אורלי: ${orlySpend.toFixed(2)} ₪`;
-                    balanceColor = '#ff6b6b';
-                } else {
-                    balanceText = `רן: ${ranSpend.toFixed(2)} ₪`;
-                    balanceColor = '#4ecdc4';
-                }
-                
-            } else if (isCurrentMonth) {
-                // Current Month (using live data)
-                totalSpent = currentTotalSpent;
-                
-                // --- CRITICAL FIX 2: Skip if current month total is 0
-                if (totalSpent === 0) {
-                    continue; 
-                }
-
-                if (totalSpent > 0) {
-                    const averageSpend = totalSpent / 2;
-                    const diffOrly = orlyTotalSpent - averageSpend;
-
-                    if (Math.abs(diffOrly) < 0.01) {
-                        balanceText = 'מאוזן';
-                        balanceColor = '#2ecc71';
-                    } else if (diffOrly > 0) {
-                        balanceText = `אורלי: ${orlyTotalSpent.toFixed(2)} ₪`;
-                        balanceColor = '#ff6b6b';
-                    } else {
-                        balanceText = `רן: ${ranTotalSpent.toFixed(2)} ₪`;
-                        balanceColor = '#4ecdc4';
-                    }
-                    
-                    // Set the current month as the initial active selection if it has data
-                    if (!initialClickHandler) {
-                        initialClickHandler = `displayArchiveDetails('${monthKey}', document.getElementById('month-${monthKey}'), true)`;
-                    }
-                    
-                } else {
-                     balanceText = 'לחץ לפרטים';
-                     balanceColor = 'var(--primary)';
-                }
+            if (Math.abs(diffOrly) < 0.01) {
+                balanceText = 'מאוזן';
+                balanceColor = '#2ecc71';
+            } else if (diffOrly > 0) {
+                balanceText = `אורלי: ${orlySpend.toFixed(2)} ₪`;
+                balanceColor = '#ff6b6b';
             } else {
-                // Skip any month key that is neither archived nor the current month
-                continue;
+                balanceText = `רן: ${ranSpend.toFixed(2)} ₪`;
+                balanceColor = '#4ecdc4';
             }
-            
-            // If we reached here, the month has data, so we add it to the list
-            monthsWithData.push(monthKey);
 
-            const clickHandler = `displayArchiveDetails('${monthKey}', this, ${isCurrentMonth})`;
+            const clickHandler = `displayArchiveDetails('${monthKey}', this)`;
             
             html += `
                 <div class="archive-month-item" 
@@ -586,33 +734,20 @@
         archiveListContainer.innerHTML = html;
         document.getElementById('summary-header').innerText = `ארכיון חודשי`;
         
-        // --- Selection Logic ---
-        if (initialClickHandler) {
-            // Automatically select the current month if it has data and was set as initial
+        // Automatically select the newest month
+        if (initialKey) {
             setTimeout(() => {
-                const initialElement = document.getElementById(`month-${currentMonthKey}`);
+                const initialElement = document.getElementById(`month-${initialKey}`);
                 if (initialElement) {
-                   displayArchiveDetails(currentMonthKey, initialElement, true);
-                }
-            }, 50);
-        } else if (monthsWithData.length > 0) {
-             // If current month has no data, select the newest archived month (which is the first in sortedKeys)
-             setTimeout(() => {
-                const firstMonthKey = monthsWithData[0];
-                const firstElement = document.getElementById(`month-${firstMonthKey}`);
-                if (firstElement) {
-                   const isFirstCurrent = firstMonthKey === currentMonthKey;
-                   displayArchiveDetails(firstMonthKey, firstElement, isFirstCurrent);
+                   displayArchiveDetails(initialKey, initialElement);
                 }
             }, 50);
         }
     }
-    
-    // --- 6. DISPLAY ARCHIVE DETAILS (Unchanged for logic) ---
-    window.displayArchiveDetails = async (monthKey, element, isCurrentMonth) => {
-        let expenses;
-        let totalSpent;
 
+
+    // --- 7. DISPLAY ARCHIVE DETAILS (Fetches specific month data from Firebase) ---
+    window.displayArchiveDetails = async (monthKey, element) => {
         // Reset active state for all month items
         document.querySelectorAll('.archive-month-item').forEach(el => el.classList.remove('active-month'));
         // Set active state for the clicked item
@@ -620,31 +755,44 @@
 
         const detailsContainer = document.getElementById('archive-details-container');
         detailsContainer.innerHTML = '<p style="text-align:center">טוען נתונים...</p>';
+
+        const [year, monthStr] = monthKey.split('-');
+        const yearNum = parseInt(year);
+        const monthNum = parseInt(monthStr);
+        const { start: startRange, end: endRange } = getStartAndEndOfMonth(yearNum, monthNum);
         
-        if (isCurrentMonth) {
-            await loadData('all'); 
-            expenses = allExpenses;
-            totalSpent = currentTotalSpent;
-        } else {
-            const archiveData = JSON.parse(localStorage.getItem('monthlyArchive'));
-            if (!archiveData[monthKey]) {
-                detailsContainer.innerHTML = '<p style="text-align:center; color:red;">שגיאה בטעינת נתוני ארכיון.</p>';
-                return;
-            }
-            const data = archiveData[monthKey];
-            expenses = data.expenses;
-            totalSpent = data.totalSpent;
-        }
+        let expenses = [];
+        let totalSpent = 0;
         
-        if (expenses.length === 0) {
-            detailsContainer.innerHTML = `<div class="card archive-details"><h3 style="margin-top:0;">${isCurrentMonth ? 'חודש נוכחי' : 'ארכיון'}</h3><p style="text-align:center;">אין הוצאות לחודש זה.</p></div>`;
-            detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+            const snapshot = await db.collection("expenses")
+                .where("date", ">=", startRange)
+                .where("date", "<=", endRange)
+                .orderBy("date", "desc")
+                .get();
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                expenses.push(data);
+                totalSpent += data.amount || 0;
+            });
+
+        } catch (error) {
+            console.error("Error fetching archive details:", error);
+            detailsContainer.innerHTML = '<p style="text-align:center; color:red;">שגיאה בטעינת נתוני ארכיון מהשרת.</p>';
             return;
         }
         
-        // Calculate balance
-        let orlySpend = expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + e.amount, 0);
-        let ranSpend = expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + e.amount, 0);
+        if (expenses.length === 0) {
+            detailsContainer.innerHTML = `<div class="card archive-details"><h3 style="margin-top:0;">ארכיון</h3><p style="text-align:center;">אין הוצאות לחודש זה.</p></div>`;
+            detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        // Recalculate balance for the selected month data
+        let orlySpend = expenses.filter(e => e.person === 'Orly').reduce((s, e) => s + (e.amount || 0), 0);
+        let ranSpend = expenses.filter(e => e.person === 'Ran').reduce((s, e) => s + (e.amount || 0), 0);
         const averageSpend = totalSpent / 2;
         const diffOrly = orlySpend - averageSpend;
 
@@ -657,8 +805,7 @@
             balanceSummary = `רן הוציא יותר: ההפרש הוא ${Math.abs(diffOrly).toFixed(2)} ₪`;
         }
         
-        const parts = monthKey.split('-');
-        const monthDisplay = MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0];
+        const monthDisplay = MONTH_NAMES[monthNum - 1] + ' ' + yearNum;
 
 
         let html = `<div class="card archive-details">
@@ -679,20 +826,21 @@
                 <td>${expense.date.split('-').reverse().join('/')}</td>
                 <td>${expense.person === 'Orly' ? 'אורלי' : 'רן'}</td>
                 <td>${expense.reason}</td>
-                <td class="amount-cell">${expense.amount.toFixed(2)} ₪</td>
+                <td class="amount-cell">${(expense.amount || 0).toFixed(2)} ₪</td>
             </tr>`;
         });
         
         html += `</tbody></table></div>`;
         
-        html += `<button onclick="exportToCSV(expenses, 'archive_${monthKey}')" class="btn btn-export">ייצא נתונים (CSV) ל-Google Sheets / Excel</button></div>`;
+        // Pass the loaded expenses for the specific archive month to the export function
+        html += `<button onclick="exportToSheets(expenses)" class="btn btn-export">פתח ב-Google Sheets (העתק + הדבק)</button></div>`;
 
         detailsContainer.innerHTML = html;
         detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
 
-    // --- 7. INPUT HANDLING (Unchanged) ---
+    // --- 8. INPUT HANDLING (Unchanged) ---
     const form = document.getElementById('expenseForm');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -734,86 +882,6 @@
         }
     });
 
-    // --- 8. SUMMARY & DELETE LOGIC (Unchanged) ---
-    async function loadData(filter) {
-        currentFilter = filter; 
-        const tbody = document.querySelector('#expenseTable tbody');
-        tbody.innerHTML = '<tr><td colspan="5">טוען נתונים...</td></tr>'; 
-        
-        let query = db.collection("expenses");
-        
-        if(filter !== 'all') {
-            query = query.where("person", "==", filter).orderBy("date", "desc");
-        } else {
-            query = query.orderBy("date", "desc");
-        }
-
-        try {
-            const snapshot = await query.get();
-            allExpenses = [];
-            currentTotalSpent = 0;
-            orlyTotalSpent = 0;
-            ranTotalSpent = 0;
-            tbody.innerHTML = ''; 
-
-            if (snapshot.empty) {
-                tbody.innerHTML = '<tr><td colspan="5">אין נתונים להצגה עבור מסנן זה</td></tr>';
-            }
-
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                data.id = doc.id; 
-                allExpenses.push(data);
-                
-                if (data.person === 'Orly') {
-                    orlyTotalSpent += data.amount;
-                } else if (data.person === 'Ran') {
-                    ranTotalSpent += data.amount;
-                }
-                currentTotalSpent += data.amount; 
-
-                const displayName = data.person === 'Orly' ? 'אורלי' : 'רן';
-                const row = `<tr>
-                    <td>${data.date.split('-').reverse().join('/')}</td>
-                    <td>${displayName}</td>
-                    <td>${data.reason}</td>
-                    <td class="amount-cell">${data.amount.toFixed(2)} ₪}</td>
-                    <td><button class="btn-delete" onclick="deleteExpense('${data.id}')">❌</button></td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
-
-        } catch (error) {
-            console.error("Firestore Query Error:", error);
-            if (error.code === 'failed-precondition' || error.message.includes('The query requires an index')) {
-                tbody.innerHTML = '<tr><td colspan="5" style="color:red; font-weight:bold; padding:20px;">שגיאה: חובה ליצור אינדקס ב-Firebase. יש לוודא שהוגדר: person ASC, date DESC</td></tr>';
-            } else {
-                tbody.innerHTML = `<tr><td colspan="5" style="color:red; font-weight:bold;">שגיאה בטעינת הנתונים: ${error.message}</td></tr>`;
-            }
-            allExpenses = []; 
-            currentTotalSpent = 0; 
-            orlyTotalSpent = 0;
-            ranTotalSpent = 0;
-        }
-        
-        updateChart(allExpenses); 
-        document.getElementById('totalMonthlySpent').innerText = currentTotalSpent.toFixed(2) + ' ₪';
-    }
-
-    window.deleteExpense = async (id) => {
-        if (!confirm("האם אתה בטוח שברצונך למחוק הוצאה זו?")) {
-            return;
-        }
-
-        try {
-            await db.collection("expenses").doc(id).delete();
-            loadData(currentFilter); 
-
-        } catch (error) {
-            console.error("Error deleting document:", error);
-            alert("שגיאה במחיקת ההוצאה: " + error.message);
-        }
-    }
 
     // --- 9. CHART LOGIC (Unchanged) ---
     function updateChart(data) {
@@ -859,30 +927,41 @@
         });
     }
 
-    // --- 10. EXPORT (CSV - Unchanged) ---
-    window.exportToCSV = (data, filenamePrefix) => {
-        if(data.length === 0) { alert("אין נתונים לייצוא"); return; }
-
-        let csv = "\uFEFFתאריך,שם,סיבה,סכום\n"; 
+    // --- 10. EXPORT (TSV for Sheets) ---
+    
+    // Helper function to convert data to tab-separated format (TSV)
+    function convertToTabSeparated(data) {
+        let text = "תאריך\tשם\tסיבה\tסכום\n"; 
         data.forEach(row => {
-            const safeReason = row.reason ? row.reason.replace(/"/g, '""') : 'ללא סיבה';
             const displayName = row.person === 'Orly' ? 'אורלי' : 'רן';
             const amount = typeof row.amount === 'number' && !isNaN(row.amount) ? row.amount.toFixed(2) : '0.00';
-            csv += `${row.date},${displayName},"${safeReason}",${amount}\n`; 
+            // Use tab (\t) separator
+            text += `${row.date}\t${displayName}\t${row.reason}\t${amount}\n`; 
         });
+        return text;
+    }
 
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+    window.exportToSheets = (data) => {
+        if(data.length === 0) { 
+            alert("אין נתונים לייצוא."); 
+            return; 
+        }
+
+        const tsvData = convertToTabSeparated(data);
         
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `${filenamePrefix}_expenses_${new Date().toISOString().slice(0,10)}.csv`);
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        URL.revokeObjectURL(url);
+        // 1. Attempt to copy to clipboard
+        navigator.clipboard.writeText(tsvData).then(() => {
+            alert("הנתונים הועתקו ללוח! לחץ אישור להמשך ל-Google Sheets והדבק (Ctrl+V).");
+            // 2. Open Google Sheets
+            window.open('https://sheets.new', '_blank');
+        }, () => {
+             // Fallback if clipboard access is denied
+             const userCopy = prompt("העתקת הנתונים האוטומטית נכשלה. אנא העתק את הטקסט למטה והדבק אותו בגיליון Google Sheets:", tsvData);
+             if (userCopy !== null) {
+                // Open Google Sheets only if the user didn't cancel the prompt
+                window.open('https://sheets.new', '_blank');
+             }
+        });
     }
 </script>
 </body>
