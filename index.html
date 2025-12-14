@@ -32,10 +32,11 @@
             font-family: 'Rubik', sans-serif;
             background-color: var(--light);
             margin: 0;
-            padding: 20px;
+            padding: 10px; /* MODIFIED: Reduced padding for better mobile fit */
             direction: rtl; 
             color: var(--dark);
             overscroll-behavior-y: none; 
+            overflow-x: hidden; /* ADDED: Disable horizontal scrolling */
         }
 
         .container {
@@ -174,17 +175,21 @@
             border-color: #2980b9;
         }
 
-        /* Table */
+        /* Table - MODIFIED FOR FIT AND SCROLLING */
         table { 
             width: 100%; 
+            table-layout: fixed; /* ADDED: Forces columns to respect width/fit rules */
             border-collapse: collapse; 
-            font-size: 0.9rem; 
+            font-size: 0.8rem; /* MODIFIED: Reduced font size for better fit */
         }
         th, td { 
-            padding: 12px 6px; 
+            padding: 8px 4px; /* MODIFIED: Reduced padding for better fit */
             text-align: right; 
             border-bottom: 1px solid #eee; 
             vertical-align: middle;
+            white-space: nowrap; /* ADDED: Forces content onto a single line */
+            overflow: hidden; /* ADDED: Hides content that doesn't fit */
+            text-overflow: ellipsis; /* ADDED: Shows ellipsis for truncation */
         }
         th:last-child { 
             text-align: center; 
@@ -195,7 +200,7 @@
         }
         th { color: #7f8c8d; font-weight: 700; }
         td { font-weight: 500; }
-        .amount-cell { font-weight: 700; color: var(--dark); direction: ltr; }
+        .amount-cell { font-weight: 700; color: var(--dark); direction: ltr; text-align: right; } /* ENSURE LTR alignment is right */
 
         /* Filter Tabs */
         .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
@@ -538,11 +543,12 @@
                 currentTotalSpent += amount; 
 
                 const displayName = data.person === 'Orly' ? 'אורלי' : 'רן';
+                // MODIFIED: Removed the trailing '}' from the amount cell
                 const row = `<tr>
                     <td>${data.date.split('-').reverse().join('/')}</td>
                     <td>${displayName}</td>
                     <td>${data.reason}</td>
-                    <td class="amount-cell">${amount.toFixed(2)} ₪}</td>
+                    <td class="amount-cell">${amount.toFixed(2)} ₪</td>
                     <td><button class="btn-delete" onclick="deleteExpense('${data.id}')">❌</button></td>
                 </tr>`;
                 tbody.innerHTML += row;
@@ -925,8 +931,6 @@
         });
     }
 
-    // --- 10. EXPORT (Removed) ---
-    
     // Initial load when the script starts (ensures current month is loaded)
     window.onload = goToSummary;
 </script>
