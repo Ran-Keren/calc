@@ -107,9 +107,23 @@
         }
         
         .btn-back { background-color: #95a5a6; margin-top: 10px; padding: 16px; font-weight: 500;}
-        .btn-export { background-color: #27ae60; font-size: 1rem; padding: 14px; }
         .btn-archive { background-color: var(--accent); font-size: 1rem; padding: 14px; }
         .btn-delete { background: none; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0;}
+
+        /* New Style for Dual Buttons */
+        .dual-btn-row {
+            display: flex;
+            gap: 10px; 
+            margin-top: 10px;
+        }
+        .dual-btn-row .btn {
+            flex: 1; 
+            margin: 0; 
+            padding: 16px;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
 
         /* Form Elements */
         .form-group { margin-bottom: 20px; }
@@ -183,19 +197,9 @@
         td { font-weight: 500; }
         .amount-cell { font-weight: 700; color: var(--dark); direction: ltr; }
 
-        /* Filter Tabs - Style for horizontal and smaller buttons */
-        .filter-tabs { 
-            display: flex; 
-            gap: 8px; 
-            margin-bottom: 15px; 
-        }
-        .filter-tabs .btn { 
-            margin: 0; 
-            padding: 12px; /* Smaller padding */
-            font-size: 1rem; /* Smaller font */
-            font-weight: 600; 
-            flex-grow: 1; /* Ensure they share space equally */
-        }
+        /* Filter Tabs */
+        .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+        .filter-tabs .btn { margin: 0; padding: 12px; font-size: 1rem; font-weight: 600; flex-grow: 1; }
 
         /* Archive View Specific Style */
         #view-archive table th, #view-archive table td {
@@ -209,20 +213,13 @@
             padding: 40px 20px;
         }
         
-        /* Archive List Scroll Styling - UPDATED FOR CENTERED ALIGNMENT */
+        /* Archive List Scroll Styling */
         .archive-month-list {
             display: flex;
-            flex-wrap: nowrap;
-            justify-content: center; /* CENTER THE ITEMS */
-            overflow-x: auto; 
+            overflow-x: scroll; /* Enable horizontal scrolling */
             gap: 10px;
-            padding-bottom: 15px; 
+            padding-bottom: 15px; /* Space for scrollbar */
             margin-bottom: 20px;
-            /* Adjust margins and padding to align center better within container */
-            padding-left: 20px; 
-            padding-right: 20px;
-            margin-left: -20px; 
-            margin-right: -20px;
         }
         .archive-month-list::-webkit-scrollbar {
             height: 5px;
@@ -332,6 +329,13 @@
             <p style="text-align:center; font-weight:bold; margin-top:20px;">סך כל ההוצאות החודשיות: <span id="totalMonthlySpent">...</span></p>
         </div>
 
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="monthSelect">בחר חודש</label>
+                <select id="monthSelect" onchange="loadData(currentFilter)" style="width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 10px; font-size: 1.2rem; font-family: inherit; background: #fafafa;">
+                    </select>
+            </div>
+        </div>
         <div class="card" style="overflow-x: auto;">
             <h3>הוצאות אחרונות</h3>
             <table id="expenseTable">
@@ -349,17 +353,10 @@
             </table>
         </div>
 
-        <button onclick="showArchiveView()" class="btn btn-archive">צפייה בארכיון חודשים קודמים</button>
-        <button onclick="exportToSheets(allExpenses)" class="btn btn-export">פתח ב-Google Sheets (העתק + הדבק)</button>
-
-        <div class="card" style="margin-bottom: 20px;">
-            <div class="form-group" style="margin-bottom: 0;">
-                <label for="monthSelect">בחר חודש</label>
-                <select id="monthSelect" onchange="loadData(currentFilter)" style="width: 100%; padding: 16px; border: 1px solid #ddd; border-radius: 10px; font-size: 1.2rem; font-family: inherit; background: #fafafa;">
-                    </select>
-            </div>
+        <div class="dual-btn-row">
+            <button onclick="showArchiveView()" class="btn btn-archive">צפייה בארכיון</button>
+            <button onclick="showView('view-home')" class="btn btn-back">חזרה לראשי</button>
         </div>
-        <button onclick="showView('view-home')" class="btn btn-back">חזרה לראשי</button>
     </div>
     
     <div id="view-archive" class="view-section">
@@ -406,19 +403,17 @@
     // --- 3. UTILITY FUNCTIONS ---
     
     /**
-     * Calculates the start and end date strings (YYYY-MM-DD) for a given month.
+     * Calculates the start and end date strings (YYYY-MM-DD) for a given year and month.
      * @param {number} year 
      * @param {number} month - 1 (January) to 12 (December)
      * @returns {{start: string, end: string}}
      */
     function getStartAndEndOfMonth(year, month) {
         const paddedMonth = String(month).padStart(2, '0');
-        const nextMonth = month === 12 ? 1 : month + 1;
-        const nextYear = month === 12 ? year + 1 : year;
-
-        // Get the last day of the current month by asking for the day before the 1st of the next month
+        
+        // Get the last day of the current month (day 0 of the next month)
         const endDay = new Date(year, month, 0).getDate(); 
-        const end = `${year}-${paddedMonth}-${endDay}`; 
+        const end = `${year}-${paddedMonth}-${String(endDay).padStart(2, '0')}`; 
         
         const start = `${year}-${paddedMonth}-01`;
         
@@ -452,6 +447,7 @@
         showView('view-input');
     }
 
+    // UPDATED: Now handles populating the month selector
     function goToSummary() {
         document.getElementById('summary-header').innerText = `סיכום הוצאות`;
         showView('view-summary');
@@ -461,11 +457,11 @@
         const initialKey = `${today.getFullYear()}-${today.getMonth() + 1}`;
         
         // טעינת רשימת החודשים ואז טעינת הנתונים
-        // populateMonthSelect will try to select the current month (initialKey)
         populateMonthSelect('monthSelect', initialKey).then(() => {
             loadData('all'); 
         });
     }
+
 
     // --- 5. SUMMARY DATA LOADING (Selected Month) ---
     async function loadData(filter) {
@@ -591,6 +587,7 @@
         const availableMonths = {}; // Key: YYYY-M, Value: { total: 0, orly: 0, ran: 0 }
         
         try {
+            // Retrieve all expenses sorted by date descending to get the newest first
             const snapshot = await db.collection("expenses")
                 .orderBy('date', 'desc')
                 .get();
@@ -599,7 +596,7 @@
                 const data = doc.data();
                 // Ensure date is valid for split, month is 1-padded (e.g., 01, 12)
                 const [year, month] = data.date.split('-'); 
-                // The key should be YYYY-M (non-padded for consistency, though split works either way)
+                // The key should be YYYY-M (non-padded)
                 const monthKey = `${year}-${parseInt(month)}`; 
                 const amount = data.amount || 0;
                 const person = data.person;
@@ -632,7 +629,7 @@
         }));
     }
     
-    // --- Function to populate Month Select (Used in goToSummary) ---
+    // Function to populate Month Select (Used in goToSummary)
     async function populateMonthSelect(selectElementId, initialMonthKey) {
         const selectEl = document.getElementById(selectElementId);
         selectEl.innerHTML = '<option value="">טוען חודשים...</option>';
@@ -671,6 +668,8 @@
 
 
     async function showArchiveView() {
+        // No need for loadData, getAllAvailableMonths will load all data for grouping
+        
         const archiveListContainer = document.getElementById('archive-month-list');
         const detailsContainer = document.getElementById('archive-details-container');
         detailsContainer.innerHTML = '<p style="text-align:center">בחר חודש מהרשימה למעלה.</p>';
@@ -713,10 +712,10 @@
                 balanceText = 'מאוזן';
                 balanceColor = '#2ecc71';
             } else if (diffOrly > 0) {
-                balanceText = `אורלי: ${diffOrly.toFixed(2)} ₪`;
+                balanceText = `אורלי: ${orlySpend.toFixed(2)} ₪`;
                 balanceColor = '#ff6b6b';
             } else {
-                balanceText = `רן: ${Math.abs(diffOrly).toFixed(2)} ₪`;
+                balanceText = `רן: ${ranSpend.toFixed(2)} ₪`;
                 balanceColor = '#4ecdc4';
             }
 
@@ -832,11 +831,8 @@
             </tr>`;
         });
         
-        html += `</tbody></table></div>`;
+        html += `</tbody></table></div></div>`;
         
-        // Pass the loaded expenses for the specific archive month to the export function
-        html += `<button onclick="exportToSheets(expenses)" class="btn btn-export">פתח ב-Google Sheets (העתק + הדבק)</button></div>`;
-
         detailsContainer.innerHTML = html;
         detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -872,7 +868,7 @@
             submitBtn.innerText = "נשמר!";
             setTimeout(() => { 
                 showView('view-home'); 
-                loadData('all');
+                goToSummary(); // Use goToSummary to ensure month selection is reset
             }, 500);
             
         } catch (error) {
@@ -929,42 +925,10 @@
         });
     }
 
-    // --- 10. EXPORT (TSV for Sheets) ---
+    // --- 10. EXPORT (Removed) ---
     
-    // Helper function to convert data to tab-separated format (TSV)
-    function convertToTabSeparated(data) {
-        let text = "תאריך\tשם\tסיבה\tסכום\n"; 
-        data.forEach(row => {
-            const displayName = row.person === 'Orly' ? 'אורלי' : 'רן';
-            const amount = typeof row.amount === 'number' && !isNaN(row.amount) ? row.amount.toFixed(2) : '0.00';
-            // Use tab (\t) separator
-            text += `${row.date}\t${displayName}\t${row.reason}\t${amount}\n`; 
-        });
-        return text;
-    }
-
-    window.exportToSheets = (data) => {
-        if(data.length === 0) { 
-            alert("אין נתונים לייצוא."); 
-            return; 
-        }
-
-        const tsvData = convertToTabSeparated(data);
-        
-        // 1. Attempt to copy to clipboard
-        navigator.clipboard.writeText(tsvData).then(() => {
-            alert("הנתונים הועתקו ללוח! לחץ אישור להמשך ל-Google Sheets והדבק (Ctrl+V).");
-            // 2. Open Google Sheets
-            window.open('https://sheets.new', '_blank');
-        }, () => {
-             // Fallback if clipboard access is denied
-             const userCopy = prompt("העתקת הנתונים האוטומטית נכשלה. אנא העתק את הטקסט למטה והדבק אותו בגיליון Google Sheets:", tsvData);
-             if (userCopy !== null) {
-                // Open Google Sheets only if the user didn't cancel the prompt
-                window.open('https://sheets.new', '_blank');
-             }
-        });
-    }
+    // Initial load when the script starts (ensures current month is loaded)
+    window.onload = goToSummary;
 </script>
 </body>
 </html>
