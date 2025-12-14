@@ -372,7 +372,7 @@
             <p style="text-align:center">בחר חודש מהרשימה למעלה.</p>
         </div>
         
-        <button onclick="showView('view-summary')" class="btn btn-back">חזרה לסיכום הנוכחי</button>
+        <button onclick="goToSummary()" class="btn btn-back">חזרה לסיכום הנוכחי</button>
     </div>
 
 </div>
@@ -456,11 +456,12 @@
         document.getElementById('summary-header').innerText = `סיכום הוצאות`;
         showView('view-summary');
         
-        // קביעת החודש הנוכחי כברירת מחדל (אם אין חודש נבחר)
+        // קביעת החודש הנוכחי כברירת מחדל
         const today = new Date();
         const initialKey = `${today.getFullYear()}-${today.getMonth() + 1}`;
         
         // טעינת רשימת החודשים ואז טעינת הנתונים
+        // populateMonthSelect will try to select the current month (initialKey)
         populateMonthSelect('monthSelect', initialKey).then(() => {
             loadData('all'); 
         });
@@ -659,10 +660,11 @@
             selectEl.appendChild(option);
         });
         
-        // Select the initial month (usually the newest)
-        if (initialMonthKey && document.querySelector(`#${selectElementId} option[value="${initialKey}"]`)) {
+        // Select the initial month (usually the newest/current month)
+        if (initialMonthKey && document.querySelector(`#${selectElementId} option[value="${initialMonthKey}"]`)) {
             selectEl.value = initialMonthKey;
         } else if(availableMonths.length > 0) {
+            // Fallback to the newest available month if current month is not in the list
             selectEl.value = availableMonths[0].key;
         }
     }
@@ -711,10 +713,10 @@
                 balanceText = 'מאוזן';
                 balanceColor = '#2ecc71';
             } else if (diffOrly > 0) {
-                balanceText = `אורלי: ${orlySpend.toFixed(2)} ₪`;
+                balanceText = `אורלי: ${diffOrly.toFixed(2)} ₪`;
                 balanceColor = '#ff6b6b';
             } else {
-                balanceText = `רן: ${ranSpend.toFixed(2)} ₪`;
+                balanceText = `רן: ${Math.abs(diffOrly).toFixed(2)} ₪`;
                 balanceColor = '#4ecdc4';
             }
 
