@@ -32,11 +32,11 @@
             font-family: 'Rubik', sans-serif;
             background-color: var(--light);
             margin: 0;
-            padding: 10px; /* MODIFIED: Reduced padding for better mobile fit */
+            padding: 10px; 
             direction: rtl; 
             color: var(--dark);
             overscroll-behavior-y: none; 
-            overflow-x: hidden; /* ADDED: Disable horizontal scrolling */
+            overflow-x: hidden; 
         }
 
         .container {
@@ -178,18 +178,18 @@
         /* Table - MODIFIED FOR FIT AND SCROLLING */
         table { 
             width: 100%; 
-            table-layout: fixed; /* ADDED: Forces columns to respect width/fit rules */
+            table-layout: fixed; /* Forces columns to respect width/fit rules */
             border-collapse: collapse; 
-            font-size: 0.8rem; /* MODIFIED: Reduced font size for better fit */
+            font-size: 0.8rem; /* Reduced font size for better fit */
         }
         th, td { 
-            padding: 8px 4px; /* MODIFIED: Reduced padding for better fit */
+            padding: 8px 4px; /* Reduced padding for better fit */
             text-align: right; 
             border-bottom: 1px solid #eee; 
             vertical-align: middle;
-            white-space: nowrap; /* ADDED: Forces content onto a single line */
-            overflow: hidden; /* ADDED: Hides content that doesn't fit */
-            text-overflow: ellipsis; /* ADDED: Shows ellipsis for truncation */
+            white-space: nowrap; /* Forces content onto a single line */
+            overflow: hidden; /* Hides content that doesn't fit */
+            text-overflow: ellipsis; /* Shows ellipsis for truncation */
         }
         th:last-child { 
             text-align: center; 
@@ -200,8 +200,41 @@
         }
         th { color: #7f8c8d; font-weight: 700; }
         td { font-weight: 500; }
-        .amount-cell { font-weight: 700; color: var(--dark); direction: ltr; text-align: right; } /* ENSURE LTR alignment is right */
+        .amount-cell { 
+            font-weight: 700; 
+            color: var(--dark); 
+            direction: ltr; 
+            text-align: right; 
+        } 
 
+        /* ADDED/MODIFIED: Specific Styles for the Archive Details Table */
+        .archive-details table {
+            width: 100%; 
+            table-layout: auto; 
+            min-width: 450px; /* Forces scroll if needed, for better column control */
+        }
+
+        /* Set column widths for Archive table (approximate to prioritize Amount) */
+        .archive-details table th:nth-child(1) { min-width: 80px; width: 20%; } /* תאריך */
+        .archive-details table th:nth-child(2) { min-width: 60px; width: 15%; } /* שם */
+        .archive-details table th:nth-child(3) { min-width: 150px; width: 45%; } /* סיבה */
+        .archive-details table th:nth-child(4) { 
+            min-width: 100px; /* סכום - נשמר רחב וגלוי */
+            width: 20%;
+            text-align: right;
+        }
+
+        /* Ensure the amount cell in the archive is fully visible and not truncated */
+        .archive-details .amount-cell {
+            white-space: nowrap; 
+            overflow: visible; 
+            text-overflow: clip; 
+            direction: ltr;
+            text-align: right;
+            font-size: 0.9rem; 
+        }
+        /* End of Archive Specific Styles */
+        
         /* Filter Tabs */
         .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
         .filter-tabs .btn { margin: 0; padding: 12px; font-size: 1rem; font-weight: 600; flex-grow: 1; }
@@ -290,7 +323,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>סכום (₪)</label>
+                    <label>סכום</label>
                     <input type="number" id="amountInput" step="0.01" inputmode="decimal" placeholder="0.00" required>
                 </div>
 
@@ -543,12 +576,12 @@
                 currentTotalSpent += amount; 
 
                 const displayName = data.person === 'Orly' ? 'אורלי' : 'רן';
-                // MODIFIED: Removed the trailing '}' from the amount cell
+                // MODIFIED: Removed the shekel sign (₪)
                 const row = `<tr>
                     <td>${data.date.split('-').reverse().join('/')}</td>
                     <td>${displayName}</td>
                     <td>${data.reason}</td>
-                    <td class="amount-cell">${amount.toFixed(2)} ₪</td>
+                    <td class="amount-cell">${amount.toFixed(2)}</td> 
                     <td><button class="btn-delete" onclick="deleteExpense('${data.id}')">❌</button></td>
                 </tr>`;
                 tbody.innerHTML += row;
@@ -568,7 +601,8 @@
         }
         
         updateChart(allExpenses); 
-        document.getElementById('totalMonthlySpent').innerText = currentTotalSpent.toFixed(2) + ' ₪';
+        // MODIFIED: Removed the shekel sign (₪)
+        document.getElementById('totalMonthlySpent').innerText = currentTotalSpent.toFixed(2);
     }
     
     window.deleteExpense = async (id) => {
@@ -674,7 +708,6 @@
 
 
     async function showArchiveView() {
-        // No need for loadData, getAllAvailableMonths will load all data for grouping
         
         const archiveListContainer = document.getElementById('archive-month-list');
         const detailsContainer = document.getElementById('archive-details-container');
@@ -707,33 +740,17 @@
             
             const totalSpent = data.total;
             const orlySpend = data.orly;
-            const ranSpend = data.ran;
-            const averageSpend = totalSpent / 2;
-            const diffOrly = orlySpend - averageSpend;
-
-            let balanceText;
-            let balanceColor;
-
-            if (Math.abs(diffOrly) < 0.01) {
-                balanceText = 'מאוזן';
-                balanceColor = '#2ecc71';
-            } else if (diffOrly > 0) {
-                balanceText = `אורלי: ${orlySpend.toFixed(2)} ₪`;
-                balanceColor = '#ff6b6b';
-            } else {
-                balanceText = `רן: ${ranSpend.toFixed(2)} ₪`;
-                balanceColor = '#4ecdc4';
-            }
-
+            // const ranSpend = data.ran; // Not needed here, used below for balance check
+            
+            // MODIFIED: Removed the shekel sign (₪) from display
             const clickHandler = `displayArchiveDetails('${monthKey}', this)`;
             
             html += `
                 <div class="archive-month-item" 
                      id="month-${monthKey}" 
-                     style="border-color: ${balanceColor};"
                      onclick="${clickHandler}">
                     <h4>${MONTH_NAMES[monthIndex]} ${year}</h4>
-                    <p>${totalSpent.toFixed(2)} ₪</p>
+                    <p>${totalSpent.toFixed(2)}</p> 
                 </div>
             `;
         }
@@ -758,7 +775,9 @@
         // Reset active state for all month items
         document.querySelectorAll('.archive-month-item').forEach(el => el.classList.remove('active-month'));
         // Set active state for the clicked item
-        element.classList.add('active-month');
+        if (element) {
+            element.classList.add('active-month');
+        }
 
         const detailsContainer = document.getElementById('archive-details-container');
         detailsContainer.innerHTML = '<p style="text-align:center">טוען נתונים...</p>';
@@ -804,12 +823,13 @@
         const diffOrly = orlySpend - averageSpend;
 
         let balanceSummary;
+        // MODIFIED: Removed the shekel sign (₪) from display
         if (Math.abs(diffOrly) < 0.01) {
             balanceSummary = 'ההוצאות היו מאוזנות לחלוטין.';
         } else if (diffOrly > 0) {
-            balanceSummary = `אורלי הוציאה יותר: ההפרש הוא ${diffOrly.toFixed(2)} ₪`;
+            balanceSummary = `אורלי הוציאה יותר: ההפרש הוא ${diffOrly.toFixed(2)}`;
         } else {
-            balanceSummary = `רן הוציא יותר: ההפרש הוא ${Math.abs(diffOrly).toFixed(2)} ₪`;
+            balanceSummary = `רן הוציא יותר: ההפרש הוא ${Math.abs(diffOrly).toFixed(2)}`;
         }
         
         const monthDisplay = MONTH_NAMES[monthNum - 1] + ' ' + yearNum;
@@ -817,7 +837,7 @@
 
         let html = `<div class="card archive-details">
             <h3 style="margin-top:0; margin-bottom:15px; font-size:1.5rem;">סיכום חודש: ${monthDisplay}</h3>
-            <p style="font-size: 1.1rem; font-weight: bold;">סה"כ הוצאות: ${totalSpent.toFixed(2)} ₪</p>
+            <p style="font-size: 1.1rem; font-weight: bold;">סה"כ הוצאות: ${totalSpent.toFixed(2)}</p>
             <p style="margin-bottom: 20px;">${balanceSummary}</p>
 
             <p style="font-weight: bold;">פירוט הוצאות:</p>
@@ -829,11 +849,12 @@
         expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         expenses.forEach(expense => {
+            // MODIFIED: Removed the shekel sign (₪) from display
             html += `<tr>
                 <td>${expense.date.split('-').reverse().join('/')}</td>
                 <td>${expense.person === 'Orly' ? 'אורלי' : 'רן'}</td>
                 <td>${expense.reason}</td>
-                <td class="amount-cell">${(expense.amount || 0).toFixed(2)} ₪</td>
+                <td class="amount-cell">${(expense.amount || 0).toFixed(2)}</td>
             </tr>`;
         });
         
