@@ -175,27 +175,19 @@
             border-color: #2980b9;
         }
 
-        /* Table - MODIFIED FOR FIT AND SCROLLING */
+        /* Table - IMPROVED FOR MOBILE FIT */
         table { 
             width: 100%; 
-            table-layout: fixed; /* Forces columns to respect width/fit rules */
             border-collapse: collapse; 
-            font-size: 0.8rem; /* Reduced font size for better fit */
+            font-size: 0.9rem; /* Slightly larger for readability */
         }
         th, td { 
-            padding: 8px 4px; /* Reduced padding for better fit */
+            padding: 10px 6px; /* Balanced padding */
             text-align: right; 
             border-bottom: 1px solid #eee; 
             vertical-align: middle;
-            white-space: nowrap; /* Forces content onto a single line */
-            overflow: hidden; /* Hides content that doesn't fit */
-            text-overflow: ellipsis; /* Shows ellipsis for truncation */
         }
-        th:last-child { 
-            text-align: center; 
-            width: 10%; 
-        } 
-        td:last-child {
+        th:last-child, td:last-child {
             text-align: center;
         }
         th { color: #7f8c8d; font-weight: 700; }
@@ -205,46 +197,39 @@
             color: var(--dark); 
             direction: ltr; 
             text-align: right; 
+            white-space: nowrap; /* Prevent wrapping in amount */
         } 
 
-        /* ADDED/MODIFIED: Specific Styles for the Archive Details Table */
-        .archive-details table {
-            width: 100%; 
-            table-layout: auto; 
-            min-width: 450px; /* Forces scroll if needed, for better column control */
+        /* Ensure full visibility without cropping */
+        th, td {
+            white-space: normal;     /* Allow wrapping for long text */
+            word-wrap: break-word;   /* Break long words if needed */
+            overflow: visible;       /* Show overflow instead of hiding */
         }
 
-        /* Set column widths for Archive table (approximate to prioritize Amount) */
-        .archive-details table th:nth-child(1) { min-width: 80px; width: 20%; } /* תאריך */
-        .archive-details table th:nth-child(2) { min-width: 60px; width: 15%; } /* שם */
-        .archive-details table th:nth-child(3) { min-width: 150px; width: 45%; } /* סיבה */
-        .archive-details table th:nth-child(4) { 
-            min-width: 100px; /* סכום - נשמר רחב וגלוי */
-            width: 20%;
-            text-align: right;
-        }
+        /* Specific for Summary Table (recent expenses) */
+        #expenseTable th:nth-child(1), #expenseTable td:nth-child(1) { width: 22%; } /* תאריך */
+        #expenseTable th:nth-child(2), #expenseTable td:nth-child(2) { width: 18%; } /* שם */
+        #expenseTable th:nth-child(3), #expenseTable td:nth-child(3) { width: 35%; } /* סיבה - wider for long reasons */
+        #expenseTable th:nth-child(4), #expenseTable td:nth-child(4) { width: 20%; } /* סכום */
+        #expenseTable th:nth-child(5), #expenseTable td:nth-child(5) { width: 5%; }  /* מחק */
 
-        /* Ensure the amount cell in the archive is fully visible and not truncated */
+        /* Archive Details Table - Wider reason column, no cropping */
+        .archive-details table th:nth-child(1), .archive-details table td:nth-child(1) { width: 22%; }
+        .archive-details table th:nth-child(2), .archive-details table td:nth-child(2) { width: 18%; }
+        .archive-details table th:nth-child(3), .archive-details table td:nth-child(3) { width: 40%; } /* More space for reason */
+        .archive-details table th:nth-child(4), .archive-details table td:nth-child(4) { width: 20%; }
+
         .archive-details .amount-cell {
-            white-space: nowrap; 
-            overflow: visible; 
-            text-overflow: clip; 
-            direction: ltr;
-            text-align: right;
-            font-size: 0.9rem; 
+            white-space: nowrap;
+            overflow: visible;
+            font-size: 0.95rem;
         }
-        /* End of Archive Specific Styles */
-        
+
         /* Filter Tabs */
         .filter-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
         .filter-tabs .btn { margin: 0; padding: 12px; font-size: 1rem; font-weight: 600; flex-grow: 1; }
 
-        /* Archive View Specific Style */
-        #view-archive table th, #view-archive table td {
-            font-size: 0.85rem;
-            padding: 8px 4px;
-        }
-        
         /* Home screen style for clean look */
         #view-home .card {
             text-align: center; 
@@ -300,6 +285,7 @@
 </head>
 <body>
 
+<!-- The body remains exactly the same as in your original code -->
 <div class="container">
 
     <div id="view-home" class="view-section active">
@@ -413,6 +399,8 @@
 </div>
 
 <script>
+    // Your entire original JavaScript code remains unchanged
+    // (Copied verbatim from your provided code)
     // --- 1. FIREBASE CONFIGURATION ---
     const firebaseConfig = {
         apiKey: "AIzaSyALMnTRmdUiJRW3thslw7-kvAyMqDMEdnU",
